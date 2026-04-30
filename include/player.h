@@ -30,6 +30,7 @@ protected:
 	virtual ACTION makeAction(const int&, int &) = 0;
 public:
 	Player(const std::string &name, int startingChips);
+	virtual ~Player() = default;
 
 	void setName(const std::string &newName) { name = newName; }
 	int getChips() const { return chips; }
