@@ -24,6 +24,9 @@ inline void clearScreen() {
 }
 #else   //Linux/macOS
 #include <locale.h>
+inline void clearScreen() {
+    std::cout << "\033[2J\033[H";
+}
 #endif
 
 inline void setConsoleToUTF8() {

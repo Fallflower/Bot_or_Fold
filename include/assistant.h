@@ -2,9 +2,27 @@
 #define __ASSISTANT_H__
 
 #include <iostream>
-#include <conio.h>
 #include <iomanip>
 #include <sstream>
+
+#ifdef _WIN32
+#include <conio.h>
+#else
+#include <termios.h>
+#include <unistd.h>
+
+inline int _getch() {
+    struct termios oldt, newt;
+    int ch;
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    ch = getchar();
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    return ch;
+}
+#endif
 
 inline int Pos(char ch, const char* str)			// 返回指定字符ch在字符串str中的下标。不存在时返回-1
 {
