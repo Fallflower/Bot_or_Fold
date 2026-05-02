@@ -28,8 +28,8 @@ int main(int argc, char* argv[]) {
         std::cin >> chips;
     }
     Position pos(pn, 0);
-    showPositionMenu(pos);
     if (hppi < 0) {
+        showPositionMenu(pos);
         std::cin >> hppi;
     }
 

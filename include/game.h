@@ -1,6 +1,7 @@
 #ifndef __GAME_H__
 #define __GAME_H__
 #include "handType.h"
+#include "handType_.h"
 #include "deck.h"
 #include "position.h"
 #include "humanPlayer.h"
@@ -49,9 +50,8 @@ private:
     std::vector<Card> getHands(const int&) const;   // 3/4/5 + 2
     std::vector<Card> getFinalHands(const int&) const;  // 5 + 2
 
-    std::vector<double> calcEquity(const int&, const int&) const;  // 计算玩家视角的胜率
-    std::vector<double> calcWinRate(const int& simulations = 12288) const;
-    void refreshWinRate();
+    double calcEquity(const int&, const int& = 12288) const;  // 计算玩家视角的胜率，返回百分数
+    std::vector<double> calcWinRate(const int& simulations = 12288) const;  // 返回上帝视角所有玩家胜率百分数
     std::vector<int> checkWinner(const std::vector<std::vector<Card>>& hands, const std::vector<Card>& public_cards) const; // 判断特定输入的玩家手牌组合下的赢家，用于蒙特卡洛模拟
     std::vector<int> checkWinner(std::vector<Card> public_cards) const; // 判断特定输入的公共牌下的赢家，用于蒙特卡洛模拟
 public:
@@ -69,6 +69,7 @@ public:
     void bet(const int&);
     void allin(const int&);
     void allinToCall(const int&);
+
     void toAct();
     void afterEnd();
 

@@ -6,9 +6,9 @@
 class BotPlayer : public Player {
     double equity = 0;
 public:
-    BotPlayer(const std::string &name, int startingChips) : Player(name, startingChips) {}
+    BotPlayer(const std::string &name, int startingChips) : Player(name, startingChips), equity(0) {}
 
-    void setEquity(double eq) { equity = eq; }
+    void setEquity(const double& eq) override { equity = eq; }
     ACTION makeAction(const int& chipsToCall, int &betAmount) override;
 };
 

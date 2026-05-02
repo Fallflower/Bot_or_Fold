@@ -82,9 +82,10 @@ void Game::checkState() {
 
 std::vector<Card> Game::getHands(const int& k) const {
     std::vector<Card> temp;
-    if (stateCode) {
+    int sc = stateCode > 3 ? 3 : stateCode;
+    if (sc) {
         const auto& pub = deck_.getPubCards();
-        temp.assign(pub.begin(), pub.end() - 3 + stateCode);
+        temp.assign(pub.begin(), pub.end() - 3 + sc);
     }
     temp.insert(temp.end(), hands[k].begin(), hands[k].end());
     return temp;
@@ -98,11 +99,11 @@ std::vector<Card> Game::getFinalHands(const int& k) const {
     return temp;
 }
 
-std::vector<double> Game::calcEquity(const int& pi, const int& simulations) const {
+double Game::calcEquity(const int& pi, const int& simulations) const {
     std::vector<double> win(playerNum, 0.0);
     Deck simDeck(hands[pi]);   // 构造一个牌堆，包含除了玩家pi的手牌以外的所有牌
     //测试
-    std::cout << "Simulated deck size: " << simDeck.getPile().size() << std::endl;
+    // std::cout << "Simulated deck size: " << simDeck.getPile().size() << std::endl;
     for (int i = 0; i < simulations; i++) {
         Deck tempDeck = simDeck;
         tempDeck.shuffle();
@@ -116,7 +117,7 @@ std::vector<double> Game::calcEquity(const int& pi, const int& simulations) cons
     }
     for (int i = 0; i < playerNum; i++)
         win[i] = 100.0 * win[i] / simulations;
-    return win;
+    return win[pi];
 }
 
 std::vector<double> Game::calcWinRate(const int& simulations) const {
@@ -178,11 +179,12 @@ std::vector<int> Game::checkWinner(const std::vector<std::vector<Card>>& simHand
             std::vector<Card> handCards = simHands[i];
             handCards.insert(handCards.end(), public_cards.begin(), public_cards.end());
             int rank = advancedEvaluate(handCards);
-            if (rank >= 0 && rank < bestRank) {
+            if (rank == INT_MAX) throw Error(4, "System Error: look up table failed");
+            if (rank < bestRank) {
                 res.clear();
                 bestRank = rank;
                 res.push_back(i);
-            } else if (rank >= 0 && rank == bestRank) {
+            } else if (rank == bestRank) {
                 res.push_back(i);
             }
         }
@@ -262,7 +264,8 @@ void Game::show() const {
         std::cout << std::right << std::setw(5) << players[i]->getChips() << " BB:\t";
         for (int j = 0; j < 2; j++)
             std::cout << hands[i][j].toString() << ' ';
-        std::cout << "\t" << chips[i][stateCode];
+        // 总投入筹码
+        std::cout << "\t" << getPlayerCommited(i);
         if (ftag[i])
             std::cout << "\t(fold)\t\t" << HandType::evaluate(getHands(i));
         else
@@ -297,7 +300,7 @@ void Game::showPlayerView() const {
         }
 
         // 筹码
-        std::cout << std::right << std::setw(5) << chips[i][stateCode] << " BB\n";
+        std::cout << std::right << std::setw(5) << getPlayerCommited(i) << " BB\n";
     }
 
     std::cout << "================================================================" << std::endl;
@@ -306,7 +309,7 @@ void Game::showPlayerView() const {
 int Game::getPot() const {
     int temp = 0;
     for (int i = 0; i < playerNum; i++)
-        for (int j = 0; j <= stateCode; j++)
+        for (int j = 0; j < 4; j++)
             temp += chips[i][j];
     return temp;
 }
@@ -315,6 +318,8 @@ void Game::fold() {
     if (hpi == active) {    // 唯一的人类玩家选择弃牌，游戏结束
         std::cout << "You folded. Better luck next time!" << std::endl;
         stateCode = 4;
+        ftag[hpi] = 1;
+        return;
     }
     ftag[active] = 1;
     // 当只剩下一个玩家时，游戏结束
@@ -354,20 +359,20 @@ void Game::bet(const int& chip) {
 
 void Game::allin(const int& chip) {
     atag[active] = true;
+    // allin是特殊的bet
+    bet(chip);
     // 当只剩下Allin玩家和fold玩家时，游戏结束
     int num = 0;
     for (int i = 0; i < playerNum; i++)
         if (!ftag[i] && !atag[i]) num++;
-    if (num == 0) {stateCode = 4; return; }
-    // allin是特殊的bet
-    bet(chip);
+    if (num == 0) stateCode = 4;
 }
 
 void Game::allinToCall(const int& chip) {
     ctag[active] = true;    // Allintocall将自己标记成为check tag, 同时不会清空他人的check tag
     atag[active] = true;
     chips[active][stateCode] += chip;
-    commit[stateCode] = chips[active][stateCode];
+    // commit[stateCode] = chips[active][stateCode];
     // 当只剩下Allin玩家和fold玩家时，游戏结束
     int num = 0;
     for (int i = 0; i < playerNum; i++)
@@ -378,6 +383,11 @@ void Game::allinToCall(const int& chip) {
 }
 
 void Game::toAct() { // 玩家筹码修改在Player的makeAction中处理
+    // BotPlayer做决策前，先计算一个玩家视角的胜率给它
+    if (active != hpi) {
+        // std::cout << "BotPlayer is thinking..." << std::endl;
+        players[active]->setEquity(calcEquity(active, 12288));
+    }
     int betAmount = getPot();  // betAmount先传入底池大小，后返回玩家下注金额
     ACTION action = players[active]->makeAction(getChipsToCall(), betAmount);
     if (action == FOLD) {

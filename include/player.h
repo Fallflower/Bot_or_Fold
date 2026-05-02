@@ -27,6 +27,7 @@ protected:
 	void addChips(const int& amount) {chips += amount;}
 	void setChips(const int& amount) {chips = amount; }
 	void setHand(const std::vector<Card> &cards);
+	virtual void setEquity(const double&) {};
 	virtual ACTION makeAction(const int&, int &) = 0;
 public:
 	Player(const std::string &name, int startingChips);

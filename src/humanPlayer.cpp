@@ -93,8 +93,8 @@ ACTION HumanPlayer::makeAction(const int& chipsToCall, int &betAmount)
     if (ba <= chipsToCall || ba > chips)
         throw Error(2, "User Error: Invalid betting scale.");
     betAmount = ba;
-    if (ba >= chips) return ALLIN;
-    if (chipsToCall > 0) return RAISE;
+    if (ba >= chips) {setChips(0); betAmount=chips; return ALLIN;}
     decChips(betAmount);
+    if (chipsToCall > 0) return RAISE;
     return BET;
 }
