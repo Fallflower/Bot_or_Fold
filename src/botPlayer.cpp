@@ -54,6 +54,7 @@ ACTION BotPlayer::makeAction(const int& chipsToCall, int &betAmount) {
 
     if (equity > potOdds + 5) {
         // 有利可图: 跟注为主, 15%半诈唬
+        if (chips <= chipsToCall) return FOLD; // 筹码不足果断fold
         if (r < 15) {
             betAmount = chipsToCall * 3;
             if (betAmount >= chips) {
@@ -71,6 +72,21 @@ ACTION BotPlayer::makeAction(const int& chipsToCall, int &betAmount) {
         }
         decChips(chipsToCall);
         return CALL;
+    }
+
+    if (equity < potOdds) {
+        // 不好摊牌，偶尔bluff
+        if (chips <= chipsToCall) return FOLD; // 筹码不足果断fold
+        if (r < 10) {
+            betAmount = chipsToCall * 4;
+            if (betAmount >= chips) {
+                betAmount = chips;
+                setChips(0);
+                return ALLIN;
+            }
+            decChips(betAmount);
+            return RAISE;
+        }
     }
     return FOLD;
 }

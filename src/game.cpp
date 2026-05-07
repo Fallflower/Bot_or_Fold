@@ -290,7 +290,7 @@ void Game::showPlayerView() const {
         std::cout << std::left << std::setw(12) << players[i]->getName();
         std::cout << " (" << pos[i] << ")";
         // 后手筹码
-        std::cout << std::right << std::setw(5) << players[i]->getChips() << " BB:\t";
+        std::cout << std::right << std::setw(5) << players[i]->getChips() << " :\t";
         // 手牌
         if (i == hpi) {
             for (int j = 0; j < 2; j++)
@@ -300,7 +300,10 @@ void Game::showPlayerView() const {
         }
 
         // 筹码
-        std::cout << std::right << std::setw(5) << getPlayerCommited(i) << " BB\n";
+        std::cout << std::right << std::setw(5) << getPlayerCommited(i) << "\t";
+
+        // 动作
+        std::cout << players[i]->getLastAction() << std::endl;
     }
 
     std::cout << "================================================================" << std::endl;
@@ -359,13 +362,13 @@ void Game::bet(const int& chip) {
 
 void Game::allin(const int& chip) {
     atag[active] = true;
-    // allin是特殊的bet
-    bet(chip);
     // 当只剩下Allin玩家和fold玩家时，游戏结束
     int num = 0;
     for (int i = 0; i < playerNum; i++)
         if (!ftag[i] && !atag[i]) num++;
-    if (num == 0) stateCode = 4;
+    if (num == 0) {stateCode = 4; return; }
+    // allin是特殊的bet
+    bet(chip);
 }
 
 void Game::allinToCall(const int& chip) {
@@ -390,6 +393,7 @@ void Game::toAct() { // 玩家筹码修改在Player的makeAction中处理
     }
     int betAmount = getPot();  // betAmount先传入底池大小，后返回玩家下注金额
     ACTION action = players[active]->makeAction(getChipsToCall(), betAmount);
+    players[active]->addActionHistory(actInfo{0, stateCode, action, betAmount});
     if (action == FOLD) {
         fold();
     } else if (action == CHECK || action == CALL) {

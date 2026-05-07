@@ -1,16 +1,21 @@
 #include "player.h"
+#include "assistant.h"
+
 
 inline std::string action2str(const ACTION& action) {
-    static const std::string actionStr[] = {" Fold ", "Check ", " Call ", " Bet  ", "Raise ", "All-in"};
+    static const std::string actionStr[] = {"Fold", "Check", "Call", "Bet", "Raise To", "All-in", "All-in to Call"};
     return actionStr[action];
 }
 
-Player::Player(const std::string &name, int startingChips): name{name}, chips{startingChips} {
-    hand = {};
-}
-
-void Player::setHand(const std::vector<Card> &cards) {
-    hand = {};
-    if (cards.size() == 2)
-        hand = cards;
+std::ostream &actInfo::output(std::ostream &out) const {
+    if (id < 0) {
+        out << std::left << std::setw(14) << ".";
+        return out;
+    }
+    out << std::left << std::setw(8) << action2str(act);
+    if (act == BET || act == RAISE)
+        out << std::right << std::setw(6) << betAmount;
+    else
+        out << std::left << std::setw(6) << ".";
+    return out;
 }
