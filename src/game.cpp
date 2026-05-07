@@ -44,7 +44,6 @@ void Game::reset_game() {
         ctag[i] = false;
         atag[i] = false;
     }
-    
 }
 
 void Game::init_players(const HumanPlayer& p, const int& c) {
@@ -421,6 +420,12 @@ void Game::afterEnd() {
     show();
     for (size_t i = 0; i < winners.size(); i++)
         std::cout << getPlayer(winners[i])->getName() << " won " << share << " chips" << std::endl;
+}
+
+void Game::nextRound() {
+    dealer = (dealer + 1) % playerNum;
+    active = (dealer + 3) % playerNum;
+    reset_game();
 }
 
 std::vector<int> Game::checkWinner() const {

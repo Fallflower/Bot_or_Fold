@@ -72,6 +72,7 @@ public:
 
     void toAct();
     void afterEnd();
+    void nextRound();
 
     bool isEnd() const { return stateCode == 4; }
     Player* getPlayer(const int& pi) const { return players[pi].get(); }

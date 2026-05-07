@@ -1,8 +1,9 @@
 #include "position.h"
 #include "assistant.h"
 
-/*
- * 根据playerNum初始化位置字符串
+/**
+ * 根据 playerNum 初始化位置序列，
+ * 通过 dealer 建立逻辑索引到位置序列索引的映射。
  * pn=2 -> {SB, BB}
  * pn=3 -> {SB, BB, D}
  * pn=4 -> {SB, BB, UTG, D}
@@ -11,7 +12,7 @@
  * pn=7 -> {SB, BB, UTG, MP, HJ, CO, D}
  * pn>7 -> {SB, BB, UTG, UTG+1, ... , MP, HJ, CO, D}
  */
-void Position::init(int pn) {
+Position::Position(int pn, int di) : dealer(di), playerNum(pn) {
     if (pn < 2)
         throw Error(100, "System Error: Player number must be at least 2.");
     poss = {" S B ", " B B "};
@@ -28,42 +29,25 @@ void Position::init(int pn) {
     case 4:
         poss.insert(poss.begin() + 2, " UTG "); [[fallthrough]];
     case 3:
-        poss.push_back("  D  "); break;// [[fallthrough]];
+        poss.push_back("  D  "); break;
     }
-    if (pn > 7)
-        for (int i = 1; i <= pn - 7; i++)
-            poss.insert(poss.begin() + 2 + i, "UTG+" + std::to_string(i));
-}
-
-void Position::adjust(int pn, int di) {
-    std::vector<std::string> temp;
-    for (int i = 0; i < pn; i++)
-        temp.push_back(poss[(pn - 1 - di + i) % pn]);
-    poss = temp; 
-}
-
-Position::Position(int pn, int di) : dealer(di) {
-    init(pn);
-    adjust(pn, di); // 调整顺序使其与game中的玩家顺序对应
+    for (int i = 1; i <= pn - 7; i++)
+        poss.insert(poss.begin() + 2 + i, "UTG+" + std::to_string(i));
 }
 
 int Position::find(const std::string& s) const {
-    int i;
-    for (i = 0; i < int(poss.size()); i++)
-        if (s == poss[i]) break;
-    return i;   // i == playerNum means failed
+    for (int i = 0; i < playerNum; i++)
+        if (s == poss[i])
+            return (i + dealer + 1) % playerNum;
+    return playerNum;
 }
 
-int Position::getDealer() const {
-    return dealer;
-}
-
-int Position::getPlayerNum() const {
-    return poss.size();
+void Position::step() {
+    dealer = (dealer + 1) % playerNum;
 }
 
 std::string Position::operator[](int pi) const {
-    return poss[pi];
+    return poss[(playerNum - 1 - dealer + pi) % playerNum];
 }
 
 
@@ -71,8 +55,8 @@ std::string Position::operator[](int pi) const {
 
 // for test
 std::ostream &Position::output(std::ostream &out) const {
-    for (auto str:poss)
-        out << str << "\t";
+    for (int i = 0; i < playerNum; i++)
+        out << (*this)[i] << "\t";
     out << std::endl;
     return out;
 }

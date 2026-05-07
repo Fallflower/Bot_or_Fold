@@ -27,20 +27,30 @@ int main(int argc, char* argv[]) {
         std::cout << " Initial Chips:" << std::flush;
         std::cin >> chips;
     }
-    Position pos(pn, 0);
+    Position pos(pn, pn-1);
     if (hppi < 0) {
         showPositionMenu(pos);
         std::cin >> hppi;
     }
 
+    bool ifContinue = true;
     Game g(pos, chips, HumanPlayer(name, chips), hppi);
-    while (!g.isEnd()) {
+    while (ifContinue ) {
+        while (!g.isEnd()) {
+            clearScreen();
+            g.showPlayerView();
+            g.toAct();
+        }
         clearScreen();
         g.showPlayerView();
-        g.toAct();
+        g.afterEnd();
+
+        std::cout << "\nNext round? (y/n): " << std::flush;
+        std::string ans;
+        std::cin >> ans;
+        if (ans != "y" && ans != "Y" && ans != "yes") {
+            ifContinue = false;
+        }
     }
-    clearScreen();
-    g.showPlayerView();
-    g.afterEnd();
     return 0;
 }

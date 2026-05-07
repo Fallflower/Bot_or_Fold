@@ -8,15 +8,15 @@ class Position
 private:
     std::vector<std::string> poss;
     int dealer;
-
-    void init(int pn);
-    void adjust(int pn, int di);
+    int playerNum;
 
 public:
     Position(int pn = 3, int di = 1);
     int find(const std::string&) const;
-    int getDealer() const;
-    int getPlayerNum() const;
+    int getDealer() const { return dealer; }
+    int getPlayerNum() const { return playerNum; }
+
+    void step();
 
     std::string operator[](int pi) const;
 
