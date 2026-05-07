@@ -1,6 +1,7 @@
 #include "botPlayer.h"
 #include <algorithm>
 #include <cstdlib>
+#include <chrono>
 #include <random>
 
 std::mt19937 gen(std::chrono::steady_clock::now().time_since_epoch().count());

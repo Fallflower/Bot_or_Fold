@@ -1,6 +1,7 @@
 #ifndef __HAND_TYPE__H__
 #define __HAND_TYPE__H__
 #include "card.h"
+#include <unordered_map>
 
 struct advancedHandType
 {

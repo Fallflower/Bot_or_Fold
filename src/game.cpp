@@ -1,5 +1,6 @@
 #include "game.h"
 #include "assistant.h"
+#include <algorithm>
 #include <thread>
 #include <random>
 
@@ -303,7 +304,7 @@ void Game::showPlayerView() const {
         std::cout << std::right << std::setw(5) << getPlayerCommited(i) << "\t";
 
         // 动作
-        std::cout << players[i]->getLastAction() << std::endl;
+        std::cout << players[i]->getLastAction() << "\n";
     }
 
     std::cout << "================================================================" << std::endl;
