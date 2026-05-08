@@ -36,7 +36,7 @@ void Game::init_game() {
     active = (dealer + 3) % playerNum;
 }
 
-void Game::reset_game() {
+void Game::reset_tags() {
     for (int i = 0; i < playerNum; i++) {
         for (int j = 0; j < 4; j++)
             chips[i][j] = 0;
@@ -50,13 +50,16 @@ void Game::init_players(const HumanPlayer& p, const int& c) {
     for (int i = 1; i < playerNum; i++)
         players.push_back(std::make_unique<BotPlayer>("BotPlayer"+std::to_string(i), c));
     players.insert(players.begin() + hpi, std::make_unique<HumanPlayer>(p));
+}
+
+void Game::init_blinds() {
     // commit blinds
     int sb = pos.find(" S B ");
     int bb = pos.find(" B B ");
     chips[sb][0] = 1;
     chips[bb][0] = 2;
-    players[sb]->setChips(c - 1);
-    players[bb]->setChips(c - 2);
+    players[sb]->decChips(1);
+    players[bb]->decChips(2);
     lastBet = bb;
 }
 
@@ -91,6 +94,16 @@ std::vector<Card> Game::getHands(const int& k) const {
     return temp;
 }
 
+std::vector<Card> Game::getKnownPubCards() const {
+    std::vector<Card> temp = {};
+    int sc = stateCode > 3 ? 3 : stateCode;
+    if (sc) {
+        const auto& pub = deck_.getPubCards();
+        temp.assign(pub.begin(), pub.end() - 3 + sc);
+    }
+    return temp;
+}
+
 std::vector<Card> Game::getFinalHands(const int& k) const {
     std::vector<Card> temp;
     const auto& pub = deck_.getPubCards();
@@ -101,9 +114,9 @@ std::vector<Card> Game::getFinalHands(const int& k) const {
 
 double Game::calcEquity(const int& pi, const int& simulations) const {
     std::vector<double> win(playerNum, 0.0);
-    Deck simDeck(hands[pi]);   // 构造一个牌堆，包含除了玩家pi的手牌以外的所有牌
-    //测试
-    // std::cout << "Simulated deck size: " << simDeck.getPile().size() << std::endl;
+
+    std::vector<Card> knownPubCards;
+    Deck simDeck(getHands(pi));   // 构造一个牌堆，不含玩家pi的手牌和已知的公共牌
     for (int i = 0; i < simulations; i++) {
         Deck tempDeck = simDeck;
         tempDeck.shuffle();
@@ -227,11 +240,10 @@ Game::Game(int pn, int d): playerNum(pn), dealer(d), stateCode(0) {
  * @param hppi (hp position index) - 人类玩家在桌面的位置标识
  */
 Game::Game(const Position& p,const int& c, const HumanPlayer& hp, const int& hppi)
-: playerNum(p.getPlayerNum()), dealer(p.getDealer()), stateCode(0) {
-    pos = p;
+: pos(p), playerNum(p.getPlayerNum()), dealer(p.getDealer()), inic(c), stateCode(0), hpi(hppi) {
     init_game();
-    hpi = hppi;
     init_players(hp, c);
+    init_blinds();
     deck_.shuffle();
     deck_.deal(playerNum, hands);
 }
@@ -423,9 +435,16 @@ void Game::afterEnd() {
 }
 
 void Game::nextRound() {
+    stateCode = 0;
     dealer = (dealer + 1) % playerNum;
     active = (dealer + 3) % playerNum;
-    reset_game();
+    reset_tags();
+    pos.step();
+    for (int i = 0; i < playerNum; i++)
+        if (i != hpi && players[i]->getChips() < inic) players[i]->setChips(inic); // 每轮给人机补筹码
+    init_blinds();
+    deck_.shuffle();
+    deck_.deal(playerNum, hands);
 }
 
 std::vector<int> Game::checkWinner() const {

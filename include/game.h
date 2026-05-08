@@ -18,6 +18,7 @@ private:
 
     int playerNum;
     std::vector<std::unique_ptr<Player>> players;
+    int inic;       // initial chips
     int hpi;        // humanPlayerIndex
     int dealer;
     int stateCode;  // 0, 1, 2, 3, 4
@@ -32,8 +33,9 @@ private:
     bool *atag;     // all-in tags
 
     void init_game();
-    void reset_game();
+    void reset_tags();
     void init_players(const HumanPlayer&, const int&);
+    void init_blinds();
     void checkState();
 
     int getPlayerCommited(const int& pi) const {
@@ -49,6 +51,7 @@ private:
 
     std::vector<Card> getHands(const int&) const;   // 3/4/5 + 2
     std::vector<Card> getFinalHands(const int&) const;  // 5 + 2
+    std::vector<Card> Game::getKnownPubCards() const;   // 3/4/5
 
     double calcEquity(const int&, const int& = 12288) const;  // 计算玩家视角的胜率，返回百分数
     std::vector<double> calcWinRate(const int& simulations = 12288) const;  // 返回上帝视角所有玩家胜率百分数

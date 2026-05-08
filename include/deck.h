@@ -20,6 +20,7 @@ public:
     std::string pubCardsStr(int stateCode) const;
     std::string pubCardsColStr(int stateCode) const;
 
+    std::vector<Card> getFrontN(int n) const;
 private:
     std::vector<Card> pile_;
     std::vector<Card> pubCards_;

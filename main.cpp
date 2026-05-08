@@ -33,9 +33,8 @@ int main(int argc, char* argv[]) {
         std::cin >> hppi;
     }
 
-    bool ifContinue = true;
     Game g(pos, chips, HumanPlayer(name, chips), hppi);
-    while (ifContinue ) {
+    while (1) {
         while (!g.isEnd()) {
             clearScreen();
             g.showPlayerView();
@@ -48,9 +47,8 @@ int main(int argc, char* argv[]) {
         std::cout << "\nNext round? (y/n): " << std::flush;
         std::string ans;
         std::cin >> ans;
-        if (ans != "y" && ans != "Y" && ans != "yes") {
-            ifContinue = false;
-        }
+        if (ans != "y" && ans != "Y" && ans != "yes") break;
+        g.nextRound();
     }
     return 0;
 }

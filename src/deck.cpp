@@ -25,6 +25,7 @@ void Deck::shuffle() {
 }
 
 void Deck::deal(int playerNum, std::vector<std::vector<Card>>& hands) {
+    hands.clear();
     for (int i = 0; i < playerNum; i++)
         if (pile_[i] > pile_[i + playerNum])
             hands.push_back({pile_[i], pile_[i + playerNum]});
@@ -32,6 +33,10 @@ void Deck::deal(int playerNum, std::vector<std::vector<Card>>& hands) {
             hands.push_back({pile_[i + playerNum], pile_[i]});
     int j = 2 * playerNum;
     pubCards_.assign(pile_.begin() + j, pile_.begin() + j + 5);
+}
+
+std::vector<Card> Deck::getFrontN(int n) const {
+    return std::vector<Card>(pile_.begin(), pile_.begin() + n);
 }
 
 std::vector<Card> Deck::remainingDeck(int playerNum, int knownPubCards) const {
