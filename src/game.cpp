@@ -334,6 +334,8 @@ void Game::showPlayerView() const {
     }
 
     std::cout << "================================================================" << std::endl;
+    if (active != hpi)
+        std::cout << players[active]->getName() << " is thinking..." << std::endl;
 }
 
 int Game::getPot() const {
@@ -373,7 +375,7 @@ void Game::call() {
     // call完发现只有自己非fold且非allin，游戏结束
     int num = 0;
     for (int i = 0; i < playerNum; i++)
-        if (!ftag[active] && !atag[active]) num++; 
+        if (!ftag[i] && !atag[i]) num++; 
     if (num <= 1) { stateCode = 4; return; }
     step();
     checkState();
@@ -419,10 +421,8 @@ void Game::allinToCall(const int& chip) {
 
 void Game::toAct() { // 玩家筹码修改在Player的makeAction中处理
     // BotPlayer做决策前，先计算一个玩家视角的胜率给它
-    if (active != hpi) {
-        // std::cout << "BotPlayer is thinking..." << std::endl;
+    if (active != hpi)
         players[active]->setEquity(calcEquity(active, 12288));
-    }
     int betAmount = getPot();  // betAmount先传入底池大小，后返回玩家下注金额
     ACTION action = players[active]->makeAction(getChipsToCall(), betAmount);
     players[active]->addActionHistory(actInfo{0, stateCode, action, betAmount});
