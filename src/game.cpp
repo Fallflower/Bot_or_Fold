@@ -53,6 +53,7 @@ void Game::init_players(const HumanPlayer& p, const int& c) {
 }
 
 void Game::init_blinds() {
+    // delete commit;
     // commit blinds
     int sb = pos.find(" S B ");
     int bb = pos.find(" B B ");
@@ -61,6 +62,7 @@ void Game::init_blinds() {
     players[sb]->decChips(1);
     players[bb]->decChips(2);
     lastBet = bb;
+    commit[0]=2;commit[1]=0;commit[2]=0;commit[3]=0;
 }
 
 void Game::checkState() {
@@ -115,15 +117,21 @@ std::vector<Card> Game::getFinalHands(const int& k) const {
 double Game::calcEquity(const int& pi, const int& simulations) const {
     std::vector<double> win(playerNum, 0.0);
 
-    std::vector<Card> knownPubCards;
+    std::vector<Card> knownPubCards = getKnownPubCards();
+    int left_n = 5 - knownPubCards.size();
     Deck simDeck(getHands(pi));   // 构造一个牌堆，不含玩家pi的手牌和已知的公共牌
     for (int i = 0; i < simulations; i++) {
         Deck tempDeck = simDeck;
         tempDeck.shuffle();
         std::vector<std::vector<Card>> simHands;
         tempDeck.deal(playerNum, simHands);
+        std::vector<Card> pub_cards(knownPubCards.begin(), knownPubCards.end());
+        if (left_n > 0) {   // 拼接已知的公共牌和随机发的公共牌
+            const auto remain_pub = tempDeck.getFrontN(left_n);
+            pub_cards.insert(pub_cards.end(), remain_pub.begin(), remain_pub.end());
+        }
         simHands.insert(simHands.begin() + pi, hands[pi]); // 将玩家pi的手牌插入模拟手牌正确的位置
-        auto winners = checkWinner(simHands, tempDeck.getPubCards());
+        auto winners = checkWinner(simHands, pub_cards);
         double share = 1.0 / winners.size();
         for (auto j : winners)
             win[j] += share;
@@ -240,7 +248,7 @@ Game::Game(int pn, int d): playerNum(pn), dealer(d), stateCode(0) {
  * @param hppi (hp position index) - 人类玩家在桌面的位置标识
  */
 Game::Game(const Position& p,const int& c, const HumanPlayer& hp, const int& hppi)
-: pos(p), playerNum(p.getPlayerNum()), dealer(p.getDealer()), inic(c), stateCode(0), hpi(hppi) {
+: playerNum(p.getPlayerNum()), inic(c), hpi(hppi), dealer(p.getDealer()), stateCode(0), pos(p) {
     init_game();
     init_players(hp, c);
     init_blinds();
@@ -315,7 +323,14 @@ void Game::showPlayerView() const {
         std::cout << std::right << std::setw(5) << getPlayerCommited(i) << "\t";
 
         // 动作
-        std::cout << players[i]->getLastAction() << "\n";
+        const actInfo aif = players[i]->getLastAction();
+        if (aif.id > -1 && aif.stateCode == stateCode)
+            std::cout << aif;
+        else if (ftag[i]) 
+            std::cout << std::left << std::setw(14) << "(fold)  .";
+        else
+            std::cout << std::left << std::setw(14) << ".";
+        std::cout << "\n";
     }
 
     std::cout << "================================================================" << std::endl;
@@ -341,12 +356,12 @@ void Game::fold() {
     int num = 0;
     for (int i = 0; i < playerNum; i++)
         if (!ftag[i]) num++;
-    if (num <= 1) {stateCode = 4; return;}
+    if (num <= 1) { stateCode = 4; return;}
     // 当只剩下Allin玩家和fold玩家时，游戏结束
     num = 0;
     for (int i = 0; i < playerNum; i++)
         if (!ftag[i] && !atag[i]) num++;
-    if (num == 0) {stateCode = 4; return; }
+    if (num == 0) { stateCode = 4; return; }
     
     step();
     checkState();
@@ -355,6 +370,11 @@ void Game::fold() {
 void Game::call() {
     chips[active][stateCode] = commit[stateCode];
     ctag[active] = true;
+    // call完发现只有自己非fold且非allin，游戏结束
+    int num = 0;
+    for (int i = 0; i < playerNum; i++)
+        if (!ftag[active] && !atag[active]) num++; 
+    if (num <= 1) { stateCode = 4; return; }
     step();
     checkState();
 }
@@ -432,6 +452,10 @@ void Game::afterEnd() {
     show();
     for (size_t i = 0; i < winners.size(); i++)
         std::cout << getPlayer(winners[i])->getName() << " won " << share << " chips" << std::endl;
+    if (players[hpi]->getChips() == 0) {
+        players[hpi]->setChips(inic);
+        std::cout << "Unfortunately, you lost all chips. Chips Topped up." << std::endl;
+    }
 }
 
 void Game::nextRound() {
@@ -440,8 +464,10 @@ void Game::nextRound() {
     active = (dealer + 3) % playerNum;
     reset_tags();
     pos.step();
-    for (int i = 0; i < playerNum; i++)
+    for (int i = 0; i < playerNum; i++) {
+        players[i]->addActionHistory(actInfo{-1, -1, CHECK, 0});
         if (i != hpi && players[i]->getChips() < inic) players[i]->setChips(inic); // 每轮给人机补筹码
+    }
     init_blinds();
     deck_.shuffle();
     deck_.deal(playerNum, hands);

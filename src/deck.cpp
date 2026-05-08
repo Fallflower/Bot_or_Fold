@@ -35,8 +35,8 @@ void Deck::deal(int playerNum, std::vector<std::vector<Card>>& hands) {
     pubCards_.assign(pile_.begin() + j, pile_.begin() + j + 5);
 }
 
-std::vector<Card> Deck::getFrontN(int n) const {
-    return std::vector<Card>(pile_.begin(), pile_.begin() + n);
+std::vector<Card> Deck::getFrontN(int n) const {     // n < 5
+    return std::vector<Card>(pubCards_.begin(), pubCards_.begin() + n);
 }
 
 std::vector<Card> Deck::remainingDeck(int playerNum, int knownPubCards) const {

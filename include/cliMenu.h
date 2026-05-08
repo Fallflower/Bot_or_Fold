@@ -62,4 +62,11 @@ inline void showPositionMenu(const Position& pos)
 	std::cout << "==========================" << std::endl;
 }
 
+inline void ifContinueMenu() {
+    std::cout << "======= Next round? ======" << std::endl;
+    std::cout << "=== Yeees          [1] ===" << std::endl;
+    std::cout << "=== Noooo    [Esc]/[2] ===" << std::endl;
+    std::cout << "==========================" << std::endl;
+}
+
 #endif

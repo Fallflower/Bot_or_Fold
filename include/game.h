@@ -51,7 +51,7 @@ private:
 
     std::vector<Card> getHands(const int&) const;   // 3/4/5 + 2
     std::vector<Card> getFinalHands(const int&) const;  // 5 + 2
-    std::vector<Card> Game::getKnownPubCards() const;   // 3/4/5
+    std::vector<Card> getKnownPubCards() const;         // 3/4/5
 
     double calcEquity(const int&, const int& = 12288) const;  // 计算玩家视角的胜率，返回百分数
     std::vector<double> calcWinRate(const int& simulations = 12288) const;  // 返回上帝视角所有玩家胜率百分数

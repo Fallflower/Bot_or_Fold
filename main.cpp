@@ -44,11 +44,16 @@ int main(int argc, char* argv[]) {
         g.showPlayerView();
         g.afterEnd();
 
-        std::cout << "\nNext round? (y/n): " << std::flush;
-        std::string ans;
-        std::cin >> ans;
-        if (ans != "y" && ans != "Y" && ans != "yes") break;
-        g.nextRound();
+        ifContinueMenu();
+        int k = 0;
+        k = Choice("Please Choose:", "12\x1b");
+        switch (k)
+        {
+        case '1':
+            g.nextRound();
+            break;
+        default: exit(0);    
+        }
     }
     return 0;
 }
