@@ -43,9 +43,12 @@ private:
 	SUIT suit;
 	CARDNUM cnum;
 public:
-	Card(CARDNUM c = ACE, SUIT s = HEA);
+	bool show;
+
+	Card(CARDNUM c = ACE, SUIT s = CLU) : suit(s), cnum(c), show(0) {}
 	std::string toString() const;
 	std::string toColorString() const;
+	std::vector<std::string> toAsciiArt() const;
 
 	SUIT getSuit() const;
 	CARDNUM getNum() const;
@@ -59,4 +62,24 @@ bool operator>(const Card &p1, const Card &p2);
 bool operator<(const Card &p1, const Card &p2);
 bool operator==(const Card &p1, const Card &p2);
 std::ostream &operator<<(std::ostream &out, const Card &p);
+std::ostream &operator<<(std::ostream &out, const std::vector<Card> &cards);
+inline void printCards(std::ostream &out, const std::vector<Card> &cards,
+				const std::string &indent = "") {
+    if (cards.empty()) return;
+
+    std::vector<std::vector<std::string>> arts;
+    for (const auto &c : cards)
+        arts.push_back(c.toAsciiArt());
+
+    int lines = arts[0].size();
+    for (int row = 0; row < lines; ++row) {
+        out << indent;
+        for (size_t i = 0; i < arts.size(); ++i) {
+            out << arts[i][row];
+            if (i != arts.size() - 1)
+                out << " ";
+        }
+        out << "\n";
+    }
+}
 #endif

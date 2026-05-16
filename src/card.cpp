@@ -1,4 +1,8 @@
 #include "card.h"
+#define RESET "\033[0m"
+#define WHITE "\033[47m"
+#define RED "\033[31m"
+#define BLACK "\033[30m"
 
 const std::map<char, SUIT> smap = {
     {'H', HEA},
@@ -53,19 +57,47 @@ const std::string suit2str(const SUIT& s) {
     return "";
 }
 
-Card::Card(CARDNUM c, SUIT s) : suit(s), cnum(c) {}
-
 std::string Card::toString() const {
     return num2str(cnum) + suit2str(suit);
 }
 
 std::string Card::toColorString() const {
+    if (!show) return std::string(BLACK) + WHITE + "[??]" + RESET;
     // ANSI color: red for hearts/diamonds, black for clubs/spades
-    std::string color = (suit == HEA || suit == DIA) ? "\033[31m" : "\033[30m";
-    std::string bg = "\033[47m";
-    std::string reset = "\033[0m";
+    std::string color = (suit == HEA || suit == DIA) ? RED : BLACK;
 
-    return color + bg + "[" + num2str(cnum) + suit2str(suit) + "]" + reset;
+    return color + WHITE + "[" + num2str(cnum) + suit2str(suit) + "]" + RESET;
+}
+
+std::vector<std::string> Card::toAsciiArt() const {
+    if (!show) {
+        std::string cb = "\033[37;44m";   // 白色字，蓝色底
+        return {
+            cb + "┌─────┐" + RESET,
+            cb + "│░░░░░│" + RESET,
+            cb + "│░░░░░│" + RESET,
+            cb + "│░░░░░│" + RESET,
+            cb + "└─────┘" + RESET
+        };
+    }
+    std::string color = (suit == HEA || suit == DIA) ? RED : BLACK;
+    std::string cb = color + WHITE;   // 颜色+背景前缀
+
+    // 牌点（数字转字符串后再处理对齐）
+    std::string rank = num2str(cnum);   // "A" "2" ... "T" "J" "Q" "K"
+    std::string leftRank  = rank == "T" ? "10" : rank + " ";   // 2字符，左对齐
+    std::string rightRank = rank == "T" ? "10" : " " + rank;   // 2字符，右对齐
+
+    // 花色符号
+    std::string suitStr = suit2str(suit);   // "♠" "♥" "♦" "♣"
+
+    std::vector<std::string> art;
+    art.push_back(cb + "┌─────┐" + RESET);
+    art.push_back(cb + "│" + leftRank  + "   │" + RESET);
+    art.push_back(cb + "│  " + suitStr + "  │" + RESET);
+    art.push_back(cb + "│   " + rightRank + "│" + RESET);
+    art.push_back(cb + "└─────┘" + RESET);
+    return art;
 }
 
 SUIT Card::getSuit() const {
@@ -112,5 +144,26 @@ std::ostream &Card::output(std::ostream &out) const
 std::ostream &operator<<(std::ostream &out, const Card &p)
 {
     p.output(out);
+    return out;
+}
+
+// 将多张牌的asciiArt并排显示
+std::ostream &operator<<(std::ostream &out, const std::vector<Card> &cards) {
+    if (cards.empty()) return out;
+
+    // 获取每张牌的矩阵
+    std::vector<std::vector<std::string>> arts;
+    for (const auto& c : cards)
+        arts.push_back(c.toAsciiArt());
+
+    int lines = arts[0].size();   // 所有牌的行数都一样
+    for (int row = 0; row < lines; ++row) {
+        for (size_t i = 0; i < arts.size(); ++i) {
+            out << arts[i][row];
+            if (i != arts.size() - 1)
+                out << " ";      // 牌与牌之间空一格
+        }
+        out << "\n";             // 每张牌的同一行输出完成后再换行
+    }
     return out;
 }

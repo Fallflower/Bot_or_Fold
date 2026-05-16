@@ -74,6 +74,7 @@ void Game::checkState() {
     }
     if (i == playerNum) {   // 进入下一阶段
         stateCode++;
+        deck_.setShow(stateCode);
         lastBet = -1;   // 清空lasetBet指针
         for (int i = 0; i < playerNum; i++) // 清空check tags
             if (!ftag[i])
@@ -254,6 +255,8 @@ Game::Game(const Position& p,const int& c, const HumanPlayer& hp, const int& hpp
     init_blinds();
     deck_.shuffle();
     deck_.deal(playerNum, hands);
+    hands[hpi][0].show = 1;
+    hands[hpi][1].show = 1;
 }
 
 Game::~Game() {
@@ -269,7 +272,9 @@ Game::~Game() {
 void Game::show() const {
     std::cout << "================================================================" << std::endl;
     std::cout << "  Public: " << std::endl;
-    std::cout << "\t\t\t" << deck_.pubCardsStr(stateCode) << std::endl;
+    std::cout << "\t\t\t";
+    for (auto c : deck_.getPubCards()) std::cout << c.toString() << " ";
+    std::cout << std::endl;
     std::cout << "   State:  " << stateStr[stateCode] << std::endl;
     std::cout << "     Pot:  " << getPot() << std::endl;
     std::cout << "----------------------------------------------------------------" << std::endl;
@@ -298,7 +303,8 @@ void Game::show() const {
 void Game::showPlayerView() const {
     std::cout << "================================================================\n";
     std::cout << "  Public: \n";
-    std::cout << "\t\t" << deck_.pubCardsColStr(stateCode) << "\n";
+    // std::cout << deck_.getPubCards();
+    printCards(std::cout, deck_.getPubCards(), "\t    ");
     std::cout << "   State:  " << stateStr[stateCode] << "\n";
     std::cout << "     Pot:  " << getPot() << "\n";
     std::cout << "----------------------------------------------------------------\n";
@@ -350,6 +356,7 @@ void Game::fold() {
     if (hpi == active) {    // 唯一的人类玩家选择弃牌，游戏结束
         std::cout << "You folded. Better luck next time!" << std::endl;
         stateCode = 4;
+        deck_.setShow(stateCode);
         ftag[hpi] = 1;
         return;
     }
@@ -376,7 +383,7 @@ void Game::call() {
     int num = 0;
     for (int i = 0; i < playerNum; i++)
         if (!ftag[i] && !atag[i]) num++; 
-    if (num <= 1) { stateCode = 4; return; }
+    if (num <= 1) { stateCode = 4; deck_.setShow(stateCode); return; }
     step();
     checkState();
 }
@@ -400,7 +407,7 @@ void Game::allin(const int& chip) {
     int num = 0;
     for (int i = 0; i < playerNum; i++)
         if (!ftag[i] && !atag[i]) num++;
-    if (num == 0) {stateCode = 4; return; }
+    if (num == 0) {stateCode = 4; deck_.setShow(stateCode); return; }
     // allin是特殊的bet
     bet(chip);
 }
@@ -410,11 +417,11 @@ void Game::allinToCall(const int& chip) {
     atag[active] = true;
     chips[active][stateCode] += chip;
     // commit[stateCode] = chips[active][stateCode];
-    // 当只剩下Allin玩家和fold玩家时，游戏结束
+    // 当除了Allin玩家和fold玩家不足2人时，游戏结束
     int num = 0;
     for (int i = 0; i < playerNum; i++)
         if (!ftag[i] && !atag[i]) num++;
-    if (num == 0) {stateCode = 4; return; }
+    if (num <= 1) {stateCode = 4; deck_.setShow(stateCode); return; }
     step();
     checkState();
 }
@@ -469,8 +476,11 @@ void Game::nextRound() {
         if (i != hpi && players[i]->getChips() < inic) players[i]->setChips(inic); // 每轮给人机补筹码
     }
     init_blinds();
+    deck_.reset();
     deck_.shuffle();
     deck_.deal(playerNum, hands);
+    hands[hpi][0].show = 1;
+    hands[hpi][1].show = 1;
 }
 
 std::vector<int> Game::checkWinner() const {

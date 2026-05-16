@@ -10,6 +10,8 @@ public:
     Deck();
     Deck(const std::vector<Card>&);
 
+    void reset();
+    void setShow(int stateCode);
     void shuffle();
     void deal(int playerNum, std::vector<std::vector<Card>>& hands);
 
@@ -17,8 +19,8 @@ public:
     const std::vector<Card>& getPubCards() const { return pubCards_; }
 
     std::vector<Card> remainingDeck(int playerNum, int knownPubCards) const;
-    std::string pubCardsStr(int stateCode) const;
-    std::string pubCardsColStr(int stateCode) const;
+    // std::string pubCardsStr(int stateCode) const;
+    // std::string pubCardsColStr(int stateCode) const;
 
     std::vector<Card> getFrontN(int n) const;
 private:
