@@ -6,3 +6,4 @@ CLAUDE.md
 *.exe
 
 main
+build/
