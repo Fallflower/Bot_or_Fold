@@ -14,14 +14,18 @@ enum HANDRANK {
     STRAIGHT_FLUSH  // 同花顺
 };
 
+template<typename NumT = CARDNUM>
 struct HandType
 {
     HANDRANK rank;
-    std::vector<CARDNUM> keys;
+    std::vector<NumT> keys;
 
     std::string to_string() const;
-    static HandType evaluate(const std::vector<Card<CARDNUM>>& cards);
+    static HandType evaluate(const std::vector<Card<NumT>>& cards);
     static int compareHandType(const HandType& t1, const HandType& t2);
 };
-std::ostream& operator<<(std::ostream& out, const HandType& t);
+
+template<typename NumT>
+std::ostream& operator<<(std::ostream& out, const HandType<NumT>& t);
+
 #endif

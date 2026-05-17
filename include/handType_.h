@@ -18,7 +18,8 @@ struct advancedHandType
     bool loaded = false;
 };
 
-int advancedEvaluate(const std::vector<Card<CARDNUM>>& cards); //通过查表评估牌型，返回一个整数，整数越大牌型越好
+template<typename NumT>
+int advancedEvaluate(const std::vector<Card<NumT>>& cards); //通过查表评估牌型，返回一个整数，整数越大牌型越好
 
 // Initialize the internal ranker with embedded binary data
 bool initAdvancedRanker(const unsigned char* data, unsigned int size);

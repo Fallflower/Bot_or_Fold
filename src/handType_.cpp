@@ -148,7 +148,8 @@ void forEachCombination(const std::vector<T>& set, int k, F&& callback) {
     }
 }
 
-int advancedEvaluate(const std::vector<Card<CARDNUM>>& cards) {
+template<typename NumT>
+int advancedEvaluate(const std::vector<Card<NumT>>& cards) {
     std::vector<int> ints;
     ints.reserve(cards.size());
     for (const auto& c : cards) ints.push_back(c.toInt());
@@ -162,3 +163,7 @@ int advancedEvaluate(const std::vector<Card<CARDNUM>>& cards) {
 
     return best_rank;
 }
+
+// Explicit instantiations
+template int advancedEvaluate<CARDNUM>(const std::vector<Card<CARDNUM>>&);
+template int advancedEvaluate<SHORT_CARDNUM>(const std::vector<Card<SHORT_CARDNUM>>&);

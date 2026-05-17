@@ -287,9 +287,9 @@ void Game<NumT>::show() const {
         // 总投入筹码
         std::cout << "\t" << getPlayerCommited(i);
         if (ftag[i])
-            std::cout << "\t(fold)\t\t" << HandType::evaluate(getHands(i));
+            std::cout << "\t(fold)\t\t" << HandType<NumT>::evaluate(getHands(i));
         else
-            std::cout << "\t" << "胜率: " << std::fixed << std::setprecision(2) << win_rate[i] << "%\t" << HandType::evaluate(getHands(i));
+            std::cout << "\t" << "胜率: " << std::fixed << std::setprecision(2) << win_rate[i] << "%\t" << HandType<NumT>::evaluate(getHands(i));
         std::cout << std::endl;
     }
     std::cout << "================================================================" << std::endl;

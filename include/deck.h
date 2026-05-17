@@ -30,17 +30,19 @@ private:
 
 template<typename NumT>
 Deck<NumT>::Deck() {
-    int rankCount = static_cast<int>(NumT::ACE) + 1;
+    constexpr int first = kFirstRank<NumT>;
+    constexpr int count = kRankCount<NumT>;
     for (int i = 0; i < 4; i++)
-        for (int j = 0; j < rankCount; j++)
+        for (int j = first; j < first + count; j++)
             pile_.push_back(Card<NumT>(static_cast<NumT>(j), static_cast<SUIT>(i)));
 }
 
 template<typename NumT>
 Deck<NumT>::Deck(const std::vector<Card<NumT>>& cards) {
-    int rankCount = static_cast<int>(NumT::ACE) + 1;
+    constexpr int first = kFirstRank<NumT>;
+    constexpr int count = kRankCount<NumT>;
     for (int i = 0; i < 4; i++)
-        for (int j = 0; j < rankCount; j++)
+        for (int j = first; j < first + count; j++)
             if (std::find(cards.begin(), cards.end(), Card<NumT>(static_cast<NumT>(j), static_cast<SUIT>(i))) == cards.end())
                 pile_.push_back(Card<NumT>(static_cast<NumT>(j), static_cast<SUIT>(i)));
 }
