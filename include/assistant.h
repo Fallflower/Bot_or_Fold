@@ -4,6 +4,7 @@
 #include <iostream>
 #include <iomanip>
 #include <sstream>
+#include <exception>
 
 #ifdef _WIN32
 #include <conio.h>
@@ -76,6 +77,7 @@ public:
 		// strcpy(mesg, text.c_str());
 		return full_mes.c_str();
 	}
+	unsigned int code() const { return m_code; }
 };
 
 #endif

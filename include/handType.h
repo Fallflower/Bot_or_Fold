@@ -20,7 +20,7 @@ struct HandType
     std::vector<CARDNUM> keys;
 
     std::string to_string() const;
-    static HandType evaluate(const std::vector<Card>& cards);
+    static HandType evaluate(const std::vector<Card<CARDNUM>>& cards);
     static int compareHandType(const HandType& t1, const HandType& t2);
 };
 std::ostream& operator<<(std::ostream& out, const HandType& t);

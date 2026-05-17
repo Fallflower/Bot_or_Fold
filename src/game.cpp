@@ -86,8 +86,8 @@ void Game::checkState() {
 }
 
 
-std::vector<Card> Game::getHands(const int& k) const {
-    std::vector<Card> temp;
+std::vector<Card<CARDNUM>> Game::getHands(const int& k) const {
+    std::vector<Card<CARDNUM>> temp;
     int sc = stateCode > 3 ? 3 : stateCode;
     if (sc) {
         const auto& pub = deck_.getPubCards();
@@ -97,8 +97,8 @@ std::vector<Card> Game::getHands(const int& k) const {
     return temp;
 }
 
-std::vector<Card> Game::getKnownPubCards() const {
-    std::vector<Card> temp = {};
+std::vector<Card<CARDNUM>> Game::getKnownPubCards() const {
+    std::vector<Card<CARDNUM>> temp = {};
     int sc = stateCode > 3 ? 3 : stateCode;
     if (sc) {
         const auto& pub = deck_.getPubCards();
@@ -107,8 +107,8 @@ std::vector<Card> Game::getKnownPubCards() const {
     return temp;
 }
 
-std::vector<Card> Game::getFinalHands(const int& k) const {
-    std::vector<Card> temp;
+std::vector<Card<CARDNUM>> Game::getFinalHands(const int& k) const {
+    std::vector<Card<CARDNUM>> temp;
     const auto& pub = deck_.getPubCards();
     temp.assign(pub.begin(), pub.end());
     temp.insert(temp.end(), hands[k].begin(), hands[k].end());
@@ -118,15 +118,15 @@ std::vector<Card> Game::getFinalHands(const int& k) const {
 double Game::calcEquity(const int& pi, const int& simulations) const {
     std::vector<double> win(playerNum, 0.0);
 
-    std::vector<Card> knownPubCards = getKnownPubCards();
+    std::vector<Card<CARDNUM>> knownPubCards = getKnownPubCards();
     int left_n = 5 - knownPubCards.size();
     Deck simDeck(getHands(pi));   // 构造一个牌堆，不含玩家pi的手牌和已知的公共牌
     for (int i = 0; i < simulations; i++) {
         Deck tempDeck = simDeck;
         tempDeck.shuffle();
-        std::vector<std::vector<Card>> simHands;
+        std::vector<std::vector<Card<CARDNUM>>> simHands;
         tempDeck.deal(playerNum, simHands);
-        std::vector<Card> pub_cards(knownPubCards.begin(), knownPubCards.end());
+        std::vector<Card<CARDNUM>> pub_cards(knownPubCards.begin(), knownPubCards.end());
         if (left_n > 0) {   // 拼接已知的公共牌和随机发的公共牌
             const auto remain_pub = tempDeck.getFrontN(left_n);
             pub_cards.insert(pub_cards.end(), remain_pub.begin(), remain_pub.end());
@@ -146,7 +146,7 @@ std::vector<double> Game::calcWinRate(const int& simulations) const {
     std::vector<double> win(playerNum, 0.0);
     if (stateCode < 3) {
         int known_pub_cards_num = (stateCode) ? stateCode + 2 : 0;
-        std::vector<Card> deck_remain = deck_.remainingDeck(playerNum, known_pub_cards_num);
+        std::vector<Card<CARDNUM>> deck_remain = deck_.remainingDeck(playerNum, known_pub_cards_num);
 
         int num_threads = std::thread::hardware_concurrency();
         if (num_threads == 0) num_threads = 4;
@@ -164,7 +164,7 @@ std::vector<double> Game::calcWinRate(const int& simulations) const {
                 for (int i = start; i < end; i++) {
                     auto tmp = deck_remain;
                     std::shuffle(tmp.begin(), tmp.end(), engin);
-                    std::vector<Card> board(tmp.begin(), tmp.begin() + 5 - known_pub_cards_num);
+                    std::vector<Card<CARDNUM>> board(tmp.begin(), tmp.begin() + 5 - known_pub_cards_num);
                     const auto& pub = deck_.getPubCards();
                     board.insert(board.end(), pub.begin(), pub.begin() + known_pub_cards_num);
                     auto winners = checkWinner(hands, board);
@@ -193,12 +193,12 @@ std::vector<double> Game::calcWinRate(const int& simulations) const {
     return win;
 }
 
-std::vector<int> Game::checkWinner(const std::vector<std::vector<Card>>& simHands, const std::vector<Card>& publicCards) const {
+std::vector<int> Game::checkWinner(const std::vector<std::vector<Card<CARDNUM>>>& simHands, const std::vector<Card<CARDNUM>>& publicCards) const {
     std::vector<int> res;
     int bestRank = INT_MAX;
     for (int i = 0; i < playerNum; i++) {
         if (!ftag[i]) {
-            std::vector<Card> handCards = simHands[i];
+            std::vector<Card<CARDNUM>> handCards = simHands[i];
             handCards.insert(handCards.end(), publicCards.begin(), publicCards.end());
             int rank = advancedEvaluate(handCards);
             if (rank == INT_MAX) throw Error(4, "System Error: look up table failed");

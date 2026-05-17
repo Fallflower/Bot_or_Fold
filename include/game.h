@@ -13,7 +13,7 @@ extern const std::string stateStr[];
 class Game
 {
 private:
-    std::vector<std::vector<Card>> hands;
+    std::vector<std::vector<Card<CARDNUM>>> hands;
     Deck deck_;
 
     int playerNum;
@@ -49,13 +49,13 @@ private:
         while (ftag[active] || atag[active]) active = (active + 1) % playerNum;
     }
 
-    std::vector<Card> getHands(const int&) const;   // 3/4/5 + 2
-    std::vector<Card> getFinalHands(const int&) const;  // 5 + 2
-    std::vector<Card> getKnownPubCards() const;         // 3/4/5
+    std::vector<Card<CARDNUM>> getHands(const int&) const;   // 3/4/5 + 2
+    std::vector<Card<CARDNUM>> getFinalHands(const int&) const;  // 5 + 2
+    std::vector<Card<CARDNUM>> getKnownPubCards() const;         // 3/4/5
 
     double calcEquity(const int&, const int& = 12288) const;  // 计算玩家视角的胜率，返回百分数
     std::vector<double> calcWinRate(const int& simulations = 12288) const;  // 返回上帝视角所有玩家胜率百分数
-    std::vector<int> checkWinner(const std::vector<std::vector<Card>>& hands, const std::vector<Card>& publicCards) const; // 判断特定输入的玩家手牌组合下的赢家
+    std::vector<int> checkWinner(const std::vector<std::vector<Card<CARDNUM>>>& hands, const std::vector<Card<CARDNUM>>& publicCards) const; // 判断特定输入的玩家手牌组合下的赢家
 public:
     Game(int pn = 3, int d = 0);
     Game(const Position& posInfo, const int& initialChips, const HumanPlayer& humanPlayer, const int &humanPlayerPosIndex);

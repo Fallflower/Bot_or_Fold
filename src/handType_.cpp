@@ -1,6 +1,7 @@
 #include "handType_.h"
 #include <fstream>
 #include <climits>
+#include <cstring>
 
 
 #define SUIT_0_MASK   0x1111111111111ULL
@@ -9,8 +10,14 @@
 #define SUIT_3_MASK   0x8888888888888ULL
 #define BIT_SUM_0     0x5555555555555ULL
 #define BIT_SUM_1     0x3333333333333ULL
-// Global singleton ranker instance
-advancedHandType g_advancedRanker;
+// File-scoped ranker instance (not a global)
+namespace {
+    advancedHandType s_ranker;
+}
+
+bool initAdvancedRanker(const unsigned char* data, unsigned int size) {
+    return s_ranker.loadFromMemory(data, size);
+}
 
 
 // Compress rank bits: for each of the 13 ranks, count how many suits are present
@@ -60,6 +67,47 @@ bool advancedHandType::load(const std::string& bin_path) {
     return true;
 }
 
+bool advancedHandType::loadFromMemory(const unsigned char* data, unsigned int size) {
+    flush_map.clear();
+    other_map.clear();
+
+    unsigned int offset = 0;
+
+    // Read flush_map count
+    int cnt, val;
+    uint64_t key;
+
+    if (offset + sizeof(cnt) > size) return false;
+    std::memcpy(&cnt, data + offset, sizeof(cnt));
+    offset += sizeof(cnt);
+
+    for (int i = 0; i < cnt; i++) {
+        if (offset + sizeof(key) + sizeof(val) > size) return false;
+        std::memcpy(&key, data + offset, sizeof(key));
+        offset += sizeof(key);
+        std::memcpy(&val, data + offset, sizeof(val));
+        offset += sizeof(val);
+        flush_map[key] = val;
+    }
+
+    // Read other_map count
+    if (offset + sizeof(cnt) > size) return false;
+    std::memcpy(&cnt, data + offset, sizeof(cnt));
+    offset += sizeof(cnt);
+
+    for (int i = 0; i < cnt; i++) {
+        if (offset + sizeof(key) + sizeof(val) > size) return false;
+        std::memcpy(&key, data + offset, sizeof(key));
+        offset += sizeof(key);
+        std::memcpy(&val, data + offset, sizeof(val));
+        offset += sizeof(val);
+        other_map[key] = val;
+    }
+
+    loaded = true;
+    return true;
+}
+
 void advancedHandType::convert(std::unordered_map<uint64_t, int>& strength_map) {
     flush_map.clear();
     other_map.clear();
@@ -100,7 +148,7 @@ void forEachCombination(const std::vector<T>& set, int k, F&& callback) {
     }
 }
 
-int advancedEvaluate(const std::vector<Card>& cards) {
+int advancedEvaluate(const std::vector<Card<CARDNUM>>& cards) {
     std::vector<int> ints;
     ints.reserve(cards.size());
     for (const auto& c : cards) ints.push_back(c.toInt());
@@ -108,7 +156,7 @@ int advancedEvaluate(const std::vector<Card>& cards) {
     int best_rank = INT_MAX;
     forEachCombination(ints, 5, [&](int a, int b, int c, int d, int e) {
         uint64_t mask = (1ULL << a) | (1ULL << b) | (1ULL << c) | (1ULL << d) | (1ULL << e);
-        int rank = g_advancedRanker[mask];
+        int rank = s_ranker[mask];
         if (rank >= 0 && rank < best_rank) best_rank = rank;
     });
 

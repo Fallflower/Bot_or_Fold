@@ -37,7 +37,7 @@ std::string HandType::to_string() const {
         temp = std::string("四条")+num2str(keys[0])+" "+num2str(keys[1])+"踢";
         break;
     case STRAIGHT_FLUSH:
-        if (keys[0] == ACE)
+        if (keys[0] == CARDNUM::ACE)
             temp = "皇家同花顺";
         else
             temp = std::string("同花顺")+num2str(keys[0]);
@@ -47,24 +47,24 @@ std::string HandType::to_string() const {
     return temp;
 }
 
-HandType HandType::evaluate(const std::vector<Card>& cards) { //支持2-7张牌的评估
+HandType HandType::evaluate(const std::vector<Card<CARDNUM>>& cards) { //支持2-7张牌的评估
     std::map<SUIT, int> suit_statistic = {
-        {HEA, 0},
-        {CLU, 0},
-        {DIA, 0},
-        {SPA, 0}
+        {SUIT::HEA, 0},
+        {SUIT::CLU, 0},
+        {SUIT::DIA, 0},
+        {SUIT::SPA, 0}
     };
     std::map<CARDNUM, int> num_statistic;
 
-    for (CARDNUM i = NUM_2; i <= ACE; i = CARDNUM(i + 1))
-        num_statistic[i] = 0;
-    
-    for (Card c : cards) {
+    for (int ci = 0; ci <= static_cast<int>(CARDNUM::ACE); ci++)
+        num_statistic[static_cast<CARDNUM>(ci)] = 0;
+
+    for (Card<CARDNUM> c : cards) {
         suit_statistic[c.getSuit()]++;
         num_statistic[c.getNum()]++;
     }
     bool flush = 0, straight = 0, quadra = 0, tag = 0;
-    CARDNUM quaNum= NUM_2, straiNum= NUM_2, quaKicker;
+    CARDNUM quaNum= CARDNUM::NUM_2, straiNum= CARDNUM::NUM_2, quaKicker;
     int pair = 0;
     CARDNUM pairNum[3];// 最多三对（不含三条及以上）
     int trible = 0;
@@ -75,34 +75,35 @@ HandType HandType::evaluate(const std::vector<Card>& cards) { //支持2-7张牌�
     for (auto it : suit_statistic)
         if (it.second >= 5) {
             flush = 1;
-            for (Card c : cards)
+            for (Card<CARDNUM> c : cards)
                 if (c.getSuit() == it.first)
                     flushCards.push_back(c.getNum());
             std::sort(flushCards.rbegin(), flushCards.rend());
             for (size_t i = 0; i <= flushCards.size() - 5; i++) {
-                if (flushCards[i] == flushCards[i + 4] - 4) {
+                if (static_cast<int>(flushCards[i]) == static_cast<int>(flushCards[i + 4]) - 4) {
                     tag = 1;
                     straiNum = flushCards[i];
                     break;
                 }
-            } 
+            }
         }
 
     // check others
-    if (num_statistic[NUM_2]
-        && num_statistic[NUM_3]
-        && num_statistic[NUM_4]
-        && num_statistic[NUM_5]
-        && num_statistic[ACE]
+    if (num_statistic[CARDNUM::NUM_2]
+        && num_statistic[CARDNUM::NUM_3]
+        && num_statistic[CARDNUM::NUM_4]
+        && num_statistic[CARDNUM::NUM_5]
+        && num_statistic[CARDNUM::ACE]
         && !tag
     ) {
         straight = 1;
-        straiNum = NUM_5;
+        straiNum = CARDNUM::NUM_5;
     }
 
-    CARDNUM strai_low = NUM_2;
+    CARDNUM strai_low = CARDNUM::NUM_2;
     int k = 0;
-    for (CARDNUM i = NUM_2; i <= ACE; i = CARDNUM(i + 1)) {
+    for (int ci = 0; ci <= static_cast<int>(CARDNUM::ACE); ci++) {
+        CARDNUM i = static_cast<CARDNUM>(ci);
         switch (num_statistic[i])
         {
         case 4:
@@ -120,12 +121,12 @@ HandType HandType::evaluate(const std::vector<Card>& cards) { //支持2-7张牌�
             break;
         case 0://   清空顺子记录
             k = 0;
-            strai_low = CARDNUM(i + 1);
+            strai_low = static_cast<CARDNUM>(ci + 1);
             break;
         default:
             break;
         }
-        if (num_statistic[i] >= 1 && i == strai_low + 1) {//    判断顺子
+        if (num_statistic[i] >= 1 && i == static_cast<CARDNUM>(static_cast<int>(strai_low) + 1)) {//    判断顺子
             strai_low = i;
             k++;
             if (k >= 4 && !tag) {
@@ -135,7 +136,7 @@ HandType HandType::evaluate(const std::vector<Card>& cards) { //支持2-7张牌�
         }
     }
     if (quadra) {   // 四条牌型，三条和对子的牌都可能是kicker
-        quaKicker = NUM_2;
+        quaKicker = CARDNUM::NUM_2;
         if (highNum.size() > 0) quaKicker = highNum[0];
         if (trible && triNum[trible - 1] > quaKicker) quaKicker = triNum[trible-1];
         if (pair && pairNum[pair-1] > quaKicker) quaKicker = pairNum[pair-1];

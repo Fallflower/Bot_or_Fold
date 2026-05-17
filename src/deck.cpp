@@ -6,16 +6,16 @@
 Deck::Deck() {
     for (int i = 0; i < 4; i++)
         for (int j = 0; j < 13; j++)
-            pile_.push_back(Card(CARDNUM(j), SUIT(i)));
+            pile_.push_back(Card<CARDNUM>(static_cast<CARDNUM>(j), static_cast<SUIT>(i)));
 }
 
 // 构造一个除了输入的cards以外的牌的牌堆
-Deck::Deck(const std::vector<Card>& cards) {
+Deck::Deck(const std::vector<Card<CARDNUM>>& cards) {
     for (int i = 0; i < 4; i++)
         for (int j = 0; j < 13; j++)
-            if (std::find(cards.begin(), cards.end(), Card(CARDNUM(j), SUIT(i))) == cards.end())
+            if (std::find(cards.begin(), cards.end(), Card<CARDNUM>(static_cast<CARDNUM>(j), static_cast<SUIT>(i))) == cards.end())
             // 如果当前牌不在输入的cards中，则加入牌堆
-                pile_.push_back(Card(CARDNUM(j), SUIT(i)));
+                pile_.push_back(Card<CARDNUM>(CARDNUM(j), SUIT(i)));
 }
 
 void Deck::reset() {
@@ -45,7 +45,7 @@ void Deck::shuffle() {
     std::shuffle(pile_.begin(), pile_.end(), engine);
 }
 
-void Deck::deal(int playerNum, std::vector<std::vector<Card>>& hands) {
+void Deck::deal(int playerNum, std::vector<std::vector<Card<CARDNUM>>>& hands) {
     hands.clear();
     for (int i = 0; i < playerNum; i++)
         if (pile_[i] > pile_[i + playerNum])
@@ -56,12 +56,12 @@ void Deck::deal(int playerNum, std::vector<std::vector<Card>>& hands) {
     pubCards_.assign(pile_.begin() + j, pile_.begin() + j + 5);
 }
 
-std::vector<Card> Deck::getFrontN(int n) const {     // n < 5
-    return std::vector<Card>(pubCards_.begin(), pubCards_.begin() + n);
+std::vector<Card<CARDNUM>> Deck::getFrontN(int n) const {     // n < 5
+    return std::vector<Card<CARDNUM>>(pubCards_.begin(), pubCards_.begin() + n);
 }
 
-std::vector<Card> Deck::remainingDeck(int playerNum, int knownPubCards) const {
-    return std::vector<Card>(
+std::vector<Card<CARDNUM>> Deck::remainingDeck(int playerNum, int knownPubCards) const {
+    return std::vector<Card<CARDNUM>>(
         pile_.begin() + 2 * playerNum + knownPubCards,
         pile_.end()
     );

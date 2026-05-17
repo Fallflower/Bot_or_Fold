@@ -1,14 +1,16 @@
 #include "game.h"
 #include "assistant.h"
 #include "cliMenu.h"
+#include "ranker_data.h"
 #include <cstdlib>
-
-extern advancedHandType g_advancedRanker;
 
 int main(int argc, char* argv[]) {
     setConsoleToUTF8();
 
-    g_advancedRanker.load("./resources/card5_dic_zipped.bin");
+    if (!initAdvancedRanker(ranker_bin, ranker_bin_len)) {
+        std::cerr << "Fatal: failed to load embedded ranker data" << std::endl;
+        return 1;
+    }
 
     std::string name = (argc > 1) ? argv[1] : "";
     int pn = (argc > 2) ? std::atoi(argv[2]) : 0;
@@ -34,26 +36,32 @@ int main(int argc, char* argv[]) {
     }
 
     Game g(pos, chips, HumanPlayer(name, chips), hppi);
-    while (1) {
-        while (!g.isEnd()) {
+    try {
+        while (1) {
+            while (!g.isEnd()) {
+                clearScreen();
+                g.showPlayerView();
+                g.toAct();
+            }
             clearScreen();
             g.showPlayerView();
-            g.toAct();
-        }
-        clearScreen();
-        g.showPlayerView();
-        g.afterEnd();
+            g.afterEnd();
 
-        ifContinueMenu();
-        int k = 0;
-        k = Choice("Please Choose:", "12\x1b");
-        switch (k)
-        {
-        case '1':
-            g.nextRound();
-            break;
-        default: exit(0);    
+            ifContinueMenu();
+            int k = 0;
+            k = Choice("Please Choose:", "12\x1b");
+            switch (k)
+            {
+            case '1':
+                g.nextRound();
+                break;
+            default: exit(0);
+            }
         }
+    } catch (const Error& e) {
+        std::cerr << e.what() << std::endl;
+        g.show();
+        exit(static_cast<int>(e.code()));
     }
     return 0;
 }
