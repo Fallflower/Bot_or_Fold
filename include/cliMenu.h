@@ -62,6 +62,14 @@ inline void showPositionMenu(const Position& pos)
 	std::cout << "==========================" << std::endl;
 }
 
+inline void showGameModeMenu() {
+    std::cout << "=== Select Game Mode =====" << std::endl;
+    std::cout << "=== 1. Standard    [1] ===" << std::endl;
+    std::cout << "=== 2. Short Deck  [2] ===" << std::endl;
+	std::cout << "=== QUIT         [Esc] ===" << std::endl;
+    std::cout << "==========================" << std::endl;
+}
+
 inline void ifContinueMenu() {
     std::cout << "======= Next round? ======" << std::endl;
     std::cout << "=== Yeees          [1] ===" << std::endl;
