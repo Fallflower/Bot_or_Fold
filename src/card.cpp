@@ -1,28 +1,5 @@
 #include "card.h"
 
-const std::map<char, SUIT> smap = {
-    {'H', SUIT::HEA},
-    {'C', SUIT::CLU},
-    {'D', SUIT::DIA},
-    {'S', SUIT::SPA}
-};
-
-const std::map<char, CARDNUM> numap = {
-    {'2', CARDNUM::NUM_2},
-    {'3', CARDNUM::NUM_3},
-    {'4', CARDNUM::NUM_4},
-    {'5', CARDNUM::NUM_5},
-    {'6', CARDNUM::NUM_6},
-    {'7', CARDNUM::NUM_7},
-    {'8', CARDNUM::NUM_8},
-    {'9', CARDNUM::NUM_9},
-    {'T', CARDNUM::NUM_10},
-    {'J', CARDNUM::JACK},
-    {'Q', CARDNUM::QUEEN},
-    {'K', CARDNUM::KING},
-    {'A', CARDNUM::ACE}
-};
-
 const std::string num2str(const CARDNUM& c) {
     switch (c)
     {

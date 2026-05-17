@@ -31,7 +31,7 @@ inline std::ostream &operator<<(std::ostream &out, const actInfo& t) {
 }
 
 class Player {
-	friend class Game;
+	template<typename> friend class Game;
 protected:
     std::string name;
     std::vector<actInfo> actionHistory;

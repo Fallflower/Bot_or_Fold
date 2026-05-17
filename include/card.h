@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 #include <cstdint>
-#include <map>
 
 enum class SUIT
 {
@@ -14,7 +13,6 @@ enum class SUIT
     SPA		// 黑桃
 };
 
-extern const std::map<char, SUIT> smap;
 const std::string suit2str(const SUIT&);
 
 enum class CARDNUM
@@ -47,7 +45,6 @@ enum class SHORT_CARDNUM
     ACE
 };
 
-extern const std::map<char, CARDNUM> numap;
 const std::string num2str(const CARDNUM&);
 const std::string num2str(const SHORT_CARDNUM&);
 

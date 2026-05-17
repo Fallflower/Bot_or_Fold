@@ -16,7 +16,8 @@ inline void Swap(ElemType &e1, ElemType &e2)
 	temp = e1;	e1 = e2;  e2 = temp;
 }
 
-void Game::init_game() {
+template<typename NumT>
+void Game<NumT>::init_game() {
     chips = new int*[playerNum];
     for (int i = 0; i < playerNum; i++)
         chips[i] = new int[4]{0};
@@ -36,7 +37,8 @@ void Game::init_game() {
     active = (dealer + 3) % playerNum;
 }
 
-void Game::reset_tags() {
+template<typename NumT>
+void Game<NumT>::reset_tags() {
     for (int i = 0; i < playerNum; i++) {
         for (int j = 0; j < 4; j++)
             chips[i][j] = 0;
@@ -46,15 +48,15 @@ void Game::reset_tags() {
     }
 }
 
-void Game::init_players(const HumanPlayer& p, const int& c) {
+template<typename NumT>
+void Game<NumT>::init_players(const HumanPlayer& p, const int& c) {
     for (int i = 1; i < playerNum; i++)
         players.push_back(std::make_unique<BotPlayer>("BotPlayer"+std::to_string(i), c));
     players.insert(players.begin() + hpi, std::make_unique<HumanPlayer>(p));
 }
 
-void Game::init_blinds() {
-    // delete commit;
-    // commit blinds
+template<typename NumT>
+void Game<NumT>::init_blinds() {
     int sb = pos.find(" S B ");
     int bb = pos.find(" B B ");
     chips[sb][0] = 1;
@@ -65,7 +67,8 @@ void Game::init_blinds() {
     commit[0]=2;commit[1]=0;commit[2]=0;commit[3]=0;
 }
 
-void Game::checkState() {
+template<typename NumT>
+void Game<NumT>::checkState() {
     int i;
     for (i = 0; i < playerNum; i++)
     {
@@ -86,8 +89,9 @@ void Game::checkState() {
 }
 
 
-std::vector<Card<CARDNUM>> Game::getHands(const int& k) const {
-    std::vector<Card<CARDNUM>> temp;
+template<typename NumT>
+std::vector<Card<NumT>> Game<NumT>::getHands(const int& k) const {
+    std::vector<Card<NumT>> temp;
     int sc = stateCode > 3 ? 3 : stateCode;
     if (sc) {
         const auto& pub = deck_.getPubCards();
@@ -97,8 +101,9 @@ std::vector<Card<CARDNUM>> Game::getHands(const int& k) const {
     return temp;
 }
 
-std::vector<Card<CARDNUM>> Game::getKnownPubCards() const {
-    std::vector<Card<CARDNUM>> temp = {};
+template<typename NumT>
+std::vector<Card<NumT>> Game<NumT>::getKnownPubCards() const {
+    std::vector<Card<NumT>> temp = {};
     int sc = stateCode > 3 ? 3 : stateCode;
     if (sc) {
         const auto& pub = deck_.getPubCards();
@@ -107,26 +112,28 @@ std::vector<Card<CARDNUM>> Game::getKnownPubCards() const {
     return temp;
 }
 
-std::vector<Card<CARDNUM>> Game::getFinalHands(const int& k) const {
-    std::vector<Card<CARDNUM>> temp;
+template<typename NumT>
+std::vector<Card<NumT>> Game<NumT>::getFinalHands(const int& k) const {
+    std::vector<Card<NumT>> temp;
     const auto& pub = deck_.getPubCards();
     temp.assign(pub.begin(), pub.end());
     temp.insert(temp.end(), hands[k].begin(), hands[k].end());
     return temp;
 }
 
-double Game::calcEquity(const int& pi, const int& simulations) const {
+template<typename NumT>
+double Game<NumT>::calcEquity(const int& pi, const int& simulations) const {
     std::vector<double> win(playerNum, 0.0);
 
-    std::vector<Card<CARDNUM>> knownPubCards = getKnownPubCards();
+    std::vector<Card<NumT>> knownPubCards = getKnownPubCards();
     int left_n = 5 - knownPubCards.size();
-    Deck simDeck(getHands(pi));   // 构造一个牌堆，不含玩家pi的手牌和已知的公共牌
+    Deck<NumT> simDeck(getHands(pi));   // 构造一个牌堆，不含玩家pi的手牌和已知的公共牌
     for (int i = 0; i < simulations; i++) {
-        Deck tempDeck = simDeck;
+        Deck<NumT> tempDeck = simDeck;
         tempDeck.shuffle();
-        std::vector<std::vector<Card<CARDNUM>>> simHands;
+        std::vector<std::vector<Card<NumT>>> simHands;
         tempDeck.deal(playerNum, simHands);
-        std::vector<Card<CARDNUM>> pub_cards(knownPubCards.begin(), knownPubCards.end());
+        std::vector<Card<NumT>> pub_cards(knownPubCards.begin(), knownPubCards.end());
         if (left_n > 0) {   // 拼接已知的公共牌和随机发的公共牌
             const auto remain_pub = tempDeck.getFrontN(left_n);
             pub_cards.insert(pub_cards.end(), remain_pub.begin(), remain_pub.end());
@@ -142,11 +149,12 @@ double Game::calcEquity(const int& pi, const int& simulations) const {
     return win[pi];
 }
 
-std::vector<double> Game::calcWinRate(const int& simulations) const {
+template<typename NumT>
+std::vector<double> Game<NumT>::calcWinRate(const int& simulations) const {
     std::vector<double> win(playerNum, 0.0);
     if (stateCode < 3) {
         int known_pub_cards_num = (stateCode) ? stateCode + 2 : 0;
-        std::vector<Card<CARDNUM>> deck_remain = deck_.remainingDeck(playerNum, known_pub_cards_num);
+        std::vector<Card<NumT>> deck_remain = deck_.remainingDeck(playerNum, known_pub_cards_num);
 
         int num_threads = std::thread::hardware_concurrency();
         if (num_threads == 0) num_threads = 4;
@@ -164,7 +172,7 @@ std::vector<double> Game::calcWinRate(const int& simulations) const {
                 for (int i = start; i < end; i++) {
                     auto tmp = deck_remain;
                     std::shuffle(tmp.begin(), tmp.end(), engin);
-                    std::vector<Card<CARDNUM>> board(tmp.begin(), tmp.begin() + 5 - known_pub_cards_num);
+                    std::vector<Card<NumT>> board(tmp.begin(), tmp.begin() + 5 - known_pub_cards_num);
                     const auto& pub = deck_.getPubCards();
                     board.insert(board.end(), pub.begin(), pub.begin() + known_pub_cards_num);
                     auto winners = checkWinner(hands, board);
@@ -193,12 +201,13 @@ std::vector<double> Game::calcWinRate(const int& simulations) const {
     return win;
 }
 
-std::vector<int> Game::checkWinner(const std::vector<std::vector<Card<CARDNUM>>>& simHands, const std::vector<Card<CARDNUM>>& publicCards) const {
+template<typename NumT>
+std::vector<int> Game<NumT>::checkWinner(const std::vector<std::vector<Card<NumT>>>& simHands, const std::vector<Card<NumT>>& publicCards) const {
     std::vector<int> res;
     int bestRank = INT_MAX;
     for (int i = 0; i < playerNum; i++) {
         if (!ftag[i]) {
-            std::vector<Card<CARDNUM>> handCards = simHands[i];
+            std::vector<Card<NumT>> handCards = simHands[i];
             handCards.insert(handCards.end(), publicCards.begin(), publicCards.end());
             int rank = advancedEvaluate(handCards);
             if (rank == INT_MAX) throw Error(4, "System Error: look up table failed");
@@ -214,21 +223,15 @@ std::vector<int> Game::checkWinner(const std::vector<std::vector<Card<CARDNUM>>>
     return res;
 }
 
-Game::Game(int pn, int d): playerNum(pn), dealer(d), stateCode(0) {
+template<typename NumT>
+Game<NumT>::Game(int pn, int d): playerNum(pn), dealer(d), stateCode(0) {
     init_game();
     deck_.shuffle();
     deck_.deal(playerNum, hands);
 }
 
-/**
- * @brief 使用此构造函数构建一个单人游戏
- * 
- * @param p (Position class) - Position类，包括玩家数量、位置信息
- * @param c (initialChips) - 初始筹码量，每位玩家的起始资金
- * @param hp (humanPlayer) - 人类玩家对象引用，包含姓名、当前手牌等信息
- * @param hppi (hp position index) - 人类玩家在桌面的位置标识
- */
-Game::Game(const Position& p,const int& c, const HumanPlayer& hp, const int& hppi)
+template<typename NumT>
+Game<NumT>::Game(const Position& p,const int& c, const HumanPlayer& hp, const int& hppi)
 : playerNum(p.getPlayerNum()), inic(c), hpi(hppi), dealer(p.getDealer()), stateCode(0), pos(p) {
     init_game();
     init_players(hp, c);
@@ -239,7 +242,8 @@ Game::Game(const Position& p,const int& c, const HumanPlayer& hp, const int& hpp
     hands[hpi][1].show = 1;
 }
 
-Game::~Game() {
+template<typename NumT>
+Game<NumT>::~Game() {
     for (int i = 0; i < playerNum; i++)
         delete[] chips[i];
     delete[] chips;
@@ -249,7 +253,8 @@ Game::~Game() {
 }
 
 
-void Game::show() const {
+template<typename NumT>
+void Game<NumT>::show() const {
     std::cout << "================================================================" << std::endl;
     std::cout << "  Public: " << std::endl;
     std::cout << "\t\t\t";
@@ -280,10 +285,10 @@ void Game::show() const {
     std::cout << "================================================================" << std::endl;
 }
 
-void Game::showPlayerView() const {
+template<typename NumT>
+void Game<NumT>::showPlayerView() const {
     std::cout << "================================================================\n";
     std::cout << "  Public: \n";
-    // std::cout << deck_.getPubCards();
     printCards(std::cout, deck_.getPubCards(), "\t    ");
     std::cout << "   State:  " << stateStr[stateCode] << "\n";
     std::cout << "     Pot:  " << getPot() << "\n";
@@ -312,7 +317,7 @@ void Game::showPlayerView() const {
         const actInfo aif = players[i]->getLastAction();
         if (aif.id > -1 && aif.stateCode == stateCode)
             std::cout << aif;
-        else if (ftag[i]) 
+        else if (ftag[i])
             std::cout << std::left << std::setw(14) << "(fold)  .";
         else
             std::cout << std::left << std::setw(14) << ".";
@@ -324,7 +329,8 @@ void Game::showPlayerView() const {
         std::cout << players[active]->getName() << " is thinking..." << std::endl;
 }
 
-int Game::getPot() const {
+template<typename NumT>
+int Game<NumT>::getPot() const {
     int temp = 0;
     for (int i = 0; i < playerNum; i++)
         for (int j = 0; j < 4; j++)
@@ -332,7 +338,8 @@ int Game::getPot() const {
     return temp;
 }
 
-void Game::fold() {
+template<typename NumT>
+void Game<NumT>::fold() {
     if (hpi == active) {    // 唯一的人类玩家选择弃牌，游戏结束
         std::cout << "You folded. Better luck next time!" << std::endl;
         stateCode = 4;
@@ -351,24 +358,26 @@ void Game::fold() {
     for (int i = 0; i < playerNum; i++)
         if (!ftag[i] && !atag[i]) num++;
     if (num == 0) { stateCode = 4; return; }
-    
+
     step();
     checkState();
 }
 
-void Game::call() {
+template<typename NumT>
+void Game<NumT>::call() {
     chips[active][stateCode] = commit[stateCode];
     ctag[active] = true;
     // call完发现只有自己非fold且非allin，游戏结束
     int num = 0;
     for (int i = 0; i < playerNum; i++)
-        if (!ftag[i] && !atag[i]) num++; 
+        if (!ftag[i] && !atag[i]) num++;
     if (num <= 1) { stateCode = 4; deck_.setShow(stateCode); return; }
     step();
     checkState();
 }
 
-void Game::bet(const int& chip) {
+template<typename NumT>
+void Game<NumT>::bet(const int& chip) {
     if (chips[active][stateCode] + chip <= commit[stateCode])
         throw Error(1, "System Error: Invalid betting scale.");
     for (int i = 0; i < playerNum; i++)
@@ -381,7 +390,8 @@ void Game::bet(const int& chip) {
     step();
 }
 
-void Game::allin(const int& chip) {
+template<typename NumT>
+void Game<NumT>::allin(const int& chip) {
     atag[active] = true;
     // 当只剩下Allin玩家和fold玩家时，游戏结束
     int num = 0;
@@ -392,7 +402,8 @@ void Game::allin(const int& chip) {
     bet(chip);
 }
 
-void Game::allinToCall(const int& chip) {
+template<typename NumT>
+void Game<NumT>::allinToCall(const int& chip) {
     ctag[active] = true;    // Allintocall将自己标记成为check tag, 同时不会清空他人的check tag
     atag[active] = true;
     chips[active][stateCode] += chip;
@@ -406,8 +417,8 @@ void Game::allinToCall(const int& chip) {
     checkState();
 }
 
-void Game::toAct() { // 玩家筹码修改在Player的makeAction中处理
-    // BotPlayer做决策前，先计算一个玩家视角的胜率给它
+template<typename NumT>
+void Game<NumT>::toAct() { // 玩家筹码修改在Player的makeAction中处理
     if (active != hpi)
         players[active]->setEquity(calcEquity(active, 12288));
     int betAmount = getPot();  // betAmount先传入底池大小，后返回玩家下注金额
@@ -426,9 +437,9 @@ void Game::toAct() { // 玩家筹码修改在Player的makeAction中处理
     }
 }
 
-void Game::afterEnd() {
+template<typename NumT>
+void Game<NumT>::afterEnd() {
     if (!isEnd()) return;
-    // 先把钱分了
     auto winners = checkWinner(hands, deck_.getPubCards());
     int pot = getPot();
     int share = pot / winners.size();
@@ -445,7 +456,8 @@ void Game::afterEnd() {
     }
 }
 
-void Game::nextRound() {
+template<typename NumT>
+void Game<NumT>::nextRound() {
     stateCode = 0;
     dealer = (dealer + 1) % playerNum;
     active = (dealer + 3) % playerNum;
@@ -462,3 +474,6 @@ void Game::nextRound() {
     hands[hpi][0].show = 1;
     hands[hpi][1].show = 1;
 }
+
+// 显式实例化
+template class Game<CARDNUM>;

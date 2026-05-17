@@ -35,7 +35,7 @@ int main(int argc, char* argv[]) {
         std::cin >> hppi;
     }
 
-    Game g(pos, chips, HumanPlayer(name, chips), hppi);
+    Game<CARDNUM> g(pos, chips, HumanPlayer(name, chips), hppi);
     try {
         while (1) {
             while (!g.isEnd()) {
