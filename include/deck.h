@@ -19,8 +19,6 @@ public:
     const std::vector<Card<CARDNUM>>& getPubCards() const { return pubCards_; }
 
     std::vector<Card<CARDNUM>> remainingDeck(int playerNum, int knownPubCards) const;
-    // std::string pubCardsStr(int stateCode) const;
-    // std::string pubCardsColStr(int stateCode) const;
 
     std::vector<Card<CARDNUM>> getFrontN(int n) const;
 private:
