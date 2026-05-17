@@ -167,7 +167,7 @@ std::vector<double> Game::calcWinRate(const int& simulations) const {
                     std::vector<Card> board(tmp.begin(), tmp.begin() + 5 - known_pub_cards_num);
                     const auto& pub = deck_.getPubCards();
                     board.insert(board.end(), pub.begin(), pub.begin() + known_pub_cards_num);
-                    auto winners = checkWinner(board);
+                    auto winners = checkWinner(hands, board);
                     double share = 1.0 / winners.size();
                     for (auto j : winners)
                         local_win[t][j] += share;
@@ -183,7 +183,7 @@ std::vector<double> Game::calcWinRate(const int& simulations) const {
     }
 
     if (stateCode >= 3) {
-        auto winners = checkWinner();
+        auto winners = checkWinner(hands, deck_.getPubCards());
         int n = winners.size();
         if (n == 1) win[winners[0]] = 1.0 * simulations;
     }
@@ -193,13 +193,13 @@ std::vector<double> Game::calcWinRate(const int& simulations) const {
     return win;
 }
 
-std::vector<int> Game::checkWinner(const std::vector<std::vector<Card>>& simHands, const std::vector<Card>& public_cards) const {
+std::vector<int> Game::checkWinner(const std::vector<std::vector<Card>>& simHands, const std::vector<Card>& publicCards) const {
     std::vector<int> res;
     int bestRank = INT_MAX;
     for (int i = 0; i < playerNum; i++) {
         if (!ftag[i]) {
             std::vector<Card> handCards = simHands[i];
-            handCards.insert(handCards.end(), public_cards.begin(), public_cards.end());
+            handCards.insert(handCards.end(), publicCards.begin(), publicCards.end());
             int rank = advancedEvaluate(handCards);
             if (rank == INT_MAX) throw Error(4, "System Error: look up table failed");
             if (rank < bestRank) {
@@ -207,26 +207,6 @@ std::vector<int> Game::checkWinner(const std::vector<std::vector<Card>>& simHand
                 bestRank = rank;
                 res.push_back(i);
             } else if (rank == bestRank) {
-                res.push_back(i);
-            }
-        }
-    }
-    return res;
-}
-
-std::vector<int> Game::checkWinner(std::vector<Card> public_cards) const {
-    std::vector<int> res;
-    int bestRank = INT_MAX;
-    for (int i = 0; i < playerNum; i++) {
-        if (!ftag[i]) {
-            std::vector<Card> handCards = hands[i];
-            handCards.insert(handCards.end(), public_cards.begin(), public_cards.end());
-            int rank = advancedEvaluate(handCards);
-            if (rank >= 0 && rank < bestRank) {
-                res.clear();
-                bestRank = rank;
-                res.push_back(i);
-            } else if (rank >= 0 && rank == bestRank) {
                 res.push_back(i);
             }
         }
@@ -449,7 +429,7 @@ void Game::toAct() { // 玩家筹码修改在Player的makeAction中处理
 void Game::afterEnd() {
     if (!isEnd()) return;
     // 先把钱分了
-    auto winners = checkWinner();
+    auto winners = checkWinner(hands, deck_.getPubCards());
     int pot = getPot();
     int share = pot / winners.size();
     for (size_t i = 0; i < winners.size(); i++)
@@ -481,23 +461,4 @@ void Game::nextRound() {
     deck_.deal(playerNum, hands);
     hands[hpi][0].show = 1;
     hands[hpi][1].show = 1;
-}
-
-std::vector<int> Game::checkWinner() const {
-    std::vector<int> res;
-    int bestRank = INT_MAX;
-    for (int i = 0; i < playerNum; i++) {
-        if (!ftag[i]) {
-            std::vector<Card> handCards = getFinalHands(i);
-            int rank = advancedEvaluate(handCards);
-            if (rank >= 0 && rank < bestRank) {
-                res.clear();
-                bestRank = rank;
-                res.push_back(i);
-            } else if (rank >= 0 && rank == bestRank) {
-                res.push_back(i);
-            }
-        }
-    }
-    return res;
 }

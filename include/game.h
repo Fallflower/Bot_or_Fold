@@ -55,8 +55,7 @@ private:
 
     double calcEquity(const int&, const int& = 12288) const;  // 计算玩家视角的胜率，返回百分数
     std::vector<double> calcWinRate(const int& simulations = 12288) const;  // 返回上帝视角所有玩家胜率百分数
-    std::vector<int> checkWinner(const std::vector<std::vector<Card>>& hands, const std::vector<Card>& public_cards) const; // 判断特定输入的玩家手牌组合下的赢家，用于蒙特卡洛模拟
-    std::vector<int> checkWinner(std::vector<Card> public_cards) const; // 判断特定输入的公共牌下的赢家，用于蒙特卡洛模拟
+    std::vector<int> checkWinner(const std::vector<std::vector<Card>>& hands, const std::vector<Card>& publicCards) const; // 判断特定输入的玩家手牌组合下的赢家
 public:
     Game(int pn = 3, int d = 0);
     Game(const Position& posInfo, const int& initialChips, const HumanPlayer& humanPlayer, const int &humanPlayerPosIndex);
@@ -79,8 +78,6 @@ public:
     void nextRound();
 
     bool isEnd() const { return stateCode > 3; }
-    std::vector<int> checkWinner() const;
-
     Position getPosiInfo() const { return pos; }
 
 };
