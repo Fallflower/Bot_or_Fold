@@ -67,6 +67,7 @@ public:
     int getPot() const;
     int getChipsToCall() const { return commit[stateCode] - chips[active][stateCode]; }
     int getState() const { return stateCode; }
+
     void fold();
     void call();     
     void bet(const int&);
@@ -77,9 +78,7 @@ public:
     void afterEnd();
     void nextRound();
 
-    bool isEnd() const { return stateCode == 4; }
-    Player* getPlayer(const int& pi) const { return players[pi].get(); }
-    Player* getActPlayer() const { return players[active].get(); }
+    bool isEnd() const { return stateCode > 3; }
     std::vector<int> checkWinner() const;
 
     Position getPosiInfo() const { return pos; }

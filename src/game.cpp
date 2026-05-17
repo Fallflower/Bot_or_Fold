@@ -458,7 +458,7 @@ void Game::afterEnd() {
     std::cout << "\nGame Over! Final Results:" << std::endl;
     show();
     for (size_t i = 0; i < winners.size(); i++)
-        std::cout << getPlayer(winners[i])->getName() << " won " << share << " chips" << std::endl;
+        std::cout << players[winners[i]]->getName() << " won " << share << " chips" << std::endl;
     if (players[hpi]->getChips() == 0) {
         players[hpi]->setChips(inic);
         std::cout << "Unfortunately, you lost all chips. Chips Topped up." << std::endl;
