@@ -78,9 +78,10 @@ public:
     }
 
     std::string toColorString() const {
-        if (!show) return std::string(BLACK) + WHITE + "[??]" + RESET;
+        if (!show) return "[ ??]";
         std::string color = (suit == SUIT::HEA || suit == SUIT::DIA) ? RED : BLACK;
-        return color + WHITE + "[" + num2str(cnum) + suit2str(suit) + "]" + RESET;
+		std::string rank = (num2str(cnum) == "T") ? "10" : " " + num2str(cnum); 
+        return color + WHITE + "[" + rank + suit2str(suit) + "]" + RESET;
     }
 
     std::vector<std::string> toAsciiArt() const {

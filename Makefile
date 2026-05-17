@@ -30,7 +30,7 @@ all: $(targets)
 	@echo "Build complete."
 
 run: $(targets)
-	./$(targets) lhy 9 200 0
+	./$(targets) lhy 9 200 0 1
 
 $(BUILD_DIR):
 	$(MKDIR) $(BUILD_DIR)

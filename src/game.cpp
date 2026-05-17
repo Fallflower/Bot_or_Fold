@@ -313,13 +313,8 @@ void Game<NumT>::showPlayerView() const {
         // 后手筹码
         std::cout << std::right << std::setw(5) << players[i]->getChips() << " :\t";
         // 手牌
-        if (i == hpi) {
-            for (int j = 0; j < 2; j++)
-                std::cout << hands[i][j] << ' ';
-        } else {
-            std::cout << "[??] [??] ";
-        }
-
+        for (int j = 0; j < 2; j++)
+            std::cout << hands[i][j] << ' ';
         // 筹码
         std::cout << std::right << std::setw(5) << getPlayerCommited(i) << "\t";
 
