@@ -50,12 +50,12 @@ const std::string num2str(const SHORT_CARDNUM&);
 
 // 各牌型的 rank 范围和总数
 template<typename T> constexpr int kFirstRank = 0;
-template<> constexpr int kFirstRank<CARDNUM> = 0;
-template<> constexpr int kFirstRank<SHORT_CARDNUM> = 4;
+template<> inline constexpr int kFirstRank<CARDNUM> = 0;
+template<> inline constexpr int kFirstRank<SHORT_CARDNUM> = 4;
 
 template<typename T> constexpr int kRankCount = 0;
-template<> constexpr int kRankCount<CARDNUM> = static_cast<int>(CARDNUM::ACE) + 1;        // 13
-template<> constexpr int kRankCount<SHORT_CARDNUM> = static_cast<int>(SHORT_CARDNUM::ACE) - static_cast<int>(SHORT_CARDNUM::NUM_6) + 1;  // 9
+template<> inline constexpr int kRankCount<CARDNUM> = static_cast<int>(CARDNUM::ACE) + 1;        // 13
+template<> inline constexpr int kRankCount<SHORT_CARDNUM> = static_cast<int>(SHORT_CARDNUM::ACE) - static_cast<int>(SHORT_CARDNUM::NUM_6) + 1;  // 9
 
 #define RESET "\033[0m"
 #define WHITE "\033[47m"

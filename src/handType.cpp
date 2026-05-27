@@ -201,7 +201,7 @@ std::ostream& operator<<(std::ostream& out, const HandType<NumT>& t) {
 }
 
 // Explicit instantiations
-template class HandType<CARDNUM>;
-template class HandType<SHORT_CARDNUM>;
+template struct HandType<CARDNUM>;
+template struct HandType<SHORT_CARDNUM>;
 template std::ostream& operator<<<CARDNUM>(std::ostream&, const HandType<CARDNUM>&);
 template std::ostream& operator<<<SHORT_CARDNUM>(std::ostream&, const HandType<SHORT_CARDNUM>&);
