@@ -14,7 +14,10 @@ enum ACTION {
 	ALLINTOCALL
 };
 
-inline std::string action2str(const ACTION&);
+inline std::string action2str(const ACTION& action) {
+    static const std::string actionStr[] = {"Fold", "Check", "Call", "Bet", "Raise To", "All-in", "All-in to Call"};
+    return actionStr[action];
+}
 
 struct actInfo {
 	int id;

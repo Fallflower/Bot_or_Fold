@@ -264,74 +264,74 @@ Game<NumT>::~Game() {
 
 
 template<typename NumT>
-void Game<NumT>::show() const {
-    std::cout << "================================================================" << std::endl;
-    std::cout << "  Public: " << std::endl;
-    std::cout << "\t\t\t";
-    for (auto c : deck_.getPubCards()) std::cout << c.toString() << " ";
-    std::cout << std::endl;
-    std::cout << "   State:  " << stateStr[stateCode] << std::endl;
-    std::cout << "     Pot:  " << getPot() << std::endl;
-    std::cout << "----------------------------------------------------------------" << std::endl;
+void Game<NumT>::show(std::ostream& out) const {
+    out << "================================================================" << std::endl;
+    out << "  Public: " << std::endl;
+    out << "\t\t\t";
+    for (auto c : deck_.getPubCards()) out << c.toString() << " ";
+    out << std::endl;
+    out << "   State:  " << stateStr[stateCode] << std::endl;
+    out << "     Pot:  " << getPot() << std::endl;
+    out << "----------------------------------------------------------------" << std::endl;
     auto win_rate = calcWinRate(20000);
     for (int i = 0; i < playerNum; i++) {
-        if (i == active) std::cout << " *";
-        else std::cout << "  ";
+        if (i == active) out << " *";
+        else out << "  ";
         // 玩家名
-        std::cout << (i==hpi ? "HP"+std::to_string(i) : "BP"+std::to_string(i));
-        std::cout << " (" << pos[i] << ")";
+        out << (i==hpi ? "HP"+std::to_string(i) : "BP"+std::to_string(i));
+        out << " (" << pos[i] << ")";
         // 后手筹码
-        std::cout << std::right << std::setw(5) << players[i]->getChips() << " BB:\t";
+        out << std::right << std::setw(5) << players[i]->getChips() << " BB:\t";
         for (int j = 0; j < 2; j++)
-            std::cout << hands[i][j].toString() << ' ';
+            out << hands[i][j].toString() << ' ';
         // 总投入筹码
-        std::cout << "\t" << getPlayerCommited(i);
+        out << "\t" << getPlayerCommited(i);
         if (ftag[i])
-            std::cout << "\t(fold)\t\t" << HandType<NumT>::evaluate(getHands(i));
+            out << "\t(fold)\t\t" << HandType<NumT>::evaluate(getHands(i));
         else
-            std::cout << "\t" << "胜率: " << std::fixed << std::setprecision(2) << win_rate[i] << "%\t" << HandType<NumT>::evaluate(getHands(i));
-        std::cout << std::endl;
+            out << "\t" << "胜率: " << std::fixed << std::setprecision(2) << win_rate[i] << "%\t" << HandType<NumT>::evaluate(getHands(i));
+        out << std::endl;
     }
-    std::cout << "================================================================" << std::endl;
+    out << "================================================================" << std::endl;
 }
 
 template<typename NumT>
-void Game<NumT>::showPlayerView() const {
-    std::cout << "================================================================\n";
-    std::cout << "  Public: \n";
-    printCards(std::cout, deck_.getPubCards(), "\t    ");
-    std::cout << "   State:  " << stateStr[stateCode] << "\n";
-    std::cout << "     Pot:  " << getPot() << "\n";
-    std::cout << "----------------------------------------------------------------\n";
+void Game<NumT>::showPlayerView(std::ostream& out) const {
+    out << "================================================================\n";
+    out << "  Public: \n";
+    printCards(out, deck_.getPubCards(), "\t    ");
+    out << "   State:  " << stateStr[stateCode] << "\n";
+    out << "     Pot:  " << getPot() << "\n";
+    out << "----------------------------------------------------------------\n";
 
     for (int i = 0; i < playerNum; i++) {
         // active标记
-        std::cout << (i == active ? " *" : "  ");
+        out << (i == active ? " *" : "  ");
         //玩家名：固定宽度
-        std::cout << std::left << std::setw(12) << players[i]->getName();
-        std::cout << " (" << pos[i] << ")";
+        out << std::left << std::setw(12) << players[i]->getName();
+        out << " (" << pos[i] << ")";
         // 后手筹码
-        std::cout << std::right << std::setw(5) << players[i]->getChips() << " :\t";
+        out << std::right << std::setw(5) << players[i]->getChips() << " :\t";
         // 手牌
         for (int j = 0; j < 2; j++)
-            std::cout << hands[i][j] << ' ';
+            out << hands[i][j] << ' ';
         // 筹码
-        std::cout << std::right << std::setw(5) << getPlayerCommited(i) << "\t";
+        out << std::right << std::setw(5) << getPlayerCommited(i) << "\t";
 
         // 动作
         const actInfo aif = players[i]->getLastAction();
         if (aif.id > -1 && aif.stateCode == stateCode)
-            std::cout << aif;
+            out << aif;
         else if (ftag[i])
-            std::cout << std::left << std::setw(14) << "(fold)  .";
+            out << std::left << std::setw(14) << "(fold)  .";
         else
-            std::cout << std::left << std::setw(14) << ".";
-        std::cout << "\n";
+            out << std::left << std::setw(14) << ".";
+        out << "\n";
     }
 
-    std::cout << "================================================================" << std::endl;
+    out << "================================================================" << std::endl;
     if (active != hpi)
-        std::cout << players[active]->getName() << " is thinking..." << std::endl;
+        out << players[active]->getName() << " is thinking..." << std::endl;
 }
 
 template<typename NumT>
@@ -429,6 +429,12 @@ void Game<NumT>::toAct() { // 玩家筹码修改在Player的makeAction中处理
     int betAmount = getPot();  // betAmount先传入底池大小，后返回玩家下注金额
     ACTION action = players[active]->makeAction(getChipsToCall(), betAmount);
     players[active]->addActionHistory(actInfo{0, stateCode, action, betAmount});
+    if (g_log) {
+        std::string actStr = action2str(action);
+        if (action == BET || action == RAISE)
+            actStr += " " + std::to_string(betAmount);
+        g_log->writeLine("  [" + std::string(stateStr[stateCode]) + "] " + players[active]->getName() + ": " + actStr);
+    }
     if (action == FOLD) {
         fold();
     } else if (action == CHECK || action == CALL) {
@@ -450,19 +456,35 @@ void Game<NumT>::afterEnd() {
     int share = pot / winners.size();
     for (size_t i = 0; i < winners.size(); i++)
         players[winners[i]]->addChips(share);
-    // 再展示结果
+
+    // 终端输出：玩家关心的结果
     std::cout << "\nGame Over! Final Results:" << std::endl;
-    show();
     for (size_t i = 0; i < winners.size(); i++)
         std::cout << players[winners[i]]->getName() << " won " << share << " chips" << std::endl;
     if (players[hpi]->getChips() == 0) {
         players[hpi]->setChips(inic);
         std::cout << "Unfortunately, you lost all chips. Chips Topped up." << std::endl;
     }
+
+    // 日志文件：详细上帝视角
+    if (g_log) {
+        g_log->writeLine("");
+        g_log->writeLine("Game Over! Final Results:");
+        show(g_log->stream());
+        for (size_t i = 0; i < winners.size(); i++)
+            g_log->writeLine(std::string(players[winners[i]]->getName()) + " won " + std::to_string(share) + " chips");
+        if (players[hpi]->getChips() == 0)
+            g_log->writeLine("Unfortunately, you lost all chips. Chips Topped up.");
+    }
 }
 
 template<typename NumT>
 void Game<NumT>::nextRound() {
+    if (g_log) {
+        g_log->writeLine("================================================================");
+        g_log->writeLine("--- New Round ---");
+        g_log->writeLine("================================================================");
+    }
     stateCode = 0;
     dealer = (dealer + 1) % playerNum;
     active = (dealer + 3) % playerNum;

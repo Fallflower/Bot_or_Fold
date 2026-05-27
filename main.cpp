@@ -5,7 +5,11 @@
 
 template<typename NumT>
 void runGame(Position& pos, int chips, const std::string& name, int hppi) {
+    GameLog log("game_log.txt");
+    g_log = &log;
+
     Game<NumT> g(pos, chips, HumanPlayer(name, chips), hppi);
+
     try {
         while (1) {
             while (!g.isEnd()) {
@@ -16,6 +20,7 @@ void runGame(Position& pos, int chips, const std::string& name, int hppi) {
             clearScreen();
             g.showPlayerView();
             g.afterEnd();
+            log.flush();
 
             ifContinueMenu();
             int k = 0;
@@ -25,12 +30,15 @@ void runGame(Position& pos, int chips, const std::string& name, int hppi) {
             case '1':
                 g.nextRound();
                 break;
-            default: exit(0);
+            default:
+                log.writeLine("=== Game Ended by User ===");
+                exit(0);
             }
         }
     } catch (const Error& e) {
         std::cerr << e.what() << std::endl;
         g.show();
+        log.writeLine(std::string("=== Error: ") + e.what() + " ===");
         exit(static_cast<int>(e.code()));
     }
 }

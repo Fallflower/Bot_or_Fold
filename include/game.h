@@ -6,7 +6,9 @@
 #include "position.h"
 #include "humanPlayer.h"
 #include "botPlayer.h"
+#include "gameLog.h"
 #include <memory>
+#include <iostream>
 
 extern const std::string stateStr[];
 
@@ -62,8 +64,8 @@ public:
     Game(const Position& posInfo, const int& initialChips, const HumanPlayer& humanPlayer, const int &humanPlayerPosIndex);
     ~Game();
 
-    void show() const;
-    void showPlayerView() const;
+    void show(std::ostream& out = std::cout) const;
+    void showPlayerView(std::ostream& out = std::cout) const;
     int getPot() const;
     int getChipsToCall() const { return commit[stateCode] - chips[active][stateCode]; }
     int getState() const { return stateCode; }
