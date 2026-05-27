@@ -212,6 +212,7 @@ Game Over! Final Results:
 │   ├── handType_.h           ← 查表评估（预计算哈希表接口）
 │   ├── position.h            ← 座位管理（SB/BB/UTG/MP/HJ/CO/D）
 │   ├── game.h                ← 游戏核心逻辑模板
+│   ├── gameLog.h             ← 游戏日志系统（全局 g_log，实时记录动作+事件）
 │   ├── assistant.h           ← 工具函数（Choice/Error）
 │   ├── cliMenu.h             ← 控制台界面（清屏/编码/菜单显示）
 │   ├── ranker_data.h         ← 标准牌哈希表数据头
@@ -289,6 +290,16 @@ Game<SHORT_CARDNUM> shortDeckGame;      // 短牌
 牌型数据通过两个独立的查表文件初始化：
 - `ranker_data.h` / `ranker_data.cpp` — 标准牌（52张）
 - `ranker_data_short.h` / `ranker_data_short.cpp` — 短牌（36张）
+
+## 游戏日志
+
+每局游戏自动在根目录生成 `game_log.txt`（追加模式），内容包含：
+
+- **实时动作记录**：每位玩家的每次行动（过牌/下注/加注/弃牌等）立即写入日志
+- **完整局终信息**：河牌结束后通过 `show()` 输出上帝视角（所有玩家手牌、胜率、牌型）
+- **新局分隔线**：多轮游戏之间以分隔符区分
+
+游戏通过全局 `g_log` 指针访问日志，Game、BotPlayer 等模块均可使用 `g_log->writeLine(...)` 写入。
 
 ## 开发
 
