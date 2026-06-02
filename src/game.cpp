@@ -289,7 +289,7 @@ void Game<NumT>::show(std::ostream& out) const {
         if (ftag[i])
             out << "\t(fold)\t\t" << HandType<NumT>::evaluate(getHands(i));
         else
-            out << "\t" << "胜率: " << std::fixed << std::setprecision(2) << win_rate[i] << "%\t" << HandType<NumT>::evaluate(getHands(i));
+            out << "\t" << std::fixed << std::setprecision(2) << win_rate[i] << "%\t" << HandType<NumT>::evaluate(getHands(i));
         out << std::endl;
     }
     out << "================================================================" << std::endl;
@@ -459,6 +459,7 @@ void Game<NumT>::afterEnd() {
 
     // 终端输出：玩家关心的结果
     std::cout << "\nGame Over! Final Results:" << std::endl;
+    show();
     for (size_t i = 0; i < winners.size(); i++)
         std::cout << players[winners[i]]->getName() << " won " << share << " chips" << std::endl;
     if (players[hpi]->getChips() == 0) {
