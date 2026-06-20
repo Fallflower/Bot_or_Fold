@@ -11,7 +11,8 @@ void runGame(Position& pos, int chips, const std::string& name, int hppi) {
     Game<NumT> g(pos, chips, HumanPlayer(name, chips), hppi);
 
     try {
-        while (1) {
+        int flag = 1;
+        while (flag) {
             while (!g.isEnd()) {
                 clearScreen();
                 g.showPlayerView();
@@ -32,7 +33,8 @@ void runGame(Position& pos, int chips, const std::string& name, int hppi) {
                 break;
             default:
                 log.writeLine("=== Game Ended by User ===");
-                exit(0);
+                flag = 0;
+                break;
             }
         }
     } catch (const Error& e) {

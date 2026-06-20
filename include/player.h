@@ -33,6 +33,13 @@ inline std::ostream &operator<<(std::ostream &out, const actInfo& t) {
 	return out;
 }
 
+struct gameInfo {
+    int stateCode;       // 轮次: 0=preflop, 1=flop, 2=turn, 3=river
+    int pot;             // 底池总筹码
+    int chipsToCall;     // 需要跟注的金额
+    int playerCommited;  // 当前玩家本轮已投入筹码
+};
+
 class Player {
 	template<typename> friend class Game;
 protected:
@@ -44,7 +51,7 @@ protected:
 	void addChips(const int& amount) {chips += amount;}
 	void setChips(const int& amount) {chips = amount; }
 	virtual void setEquity(const double&) {};
-	virtual ACTION makeAction(const int&, int &) = 0;
+	virtual ACTION makeAction(const gameInfo&, int &) = 0;
 
 	void addActionHistory(const actInfo& act) { actionHistory.push_back(act); }
 public:

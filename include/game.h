@@ -25,7 +25,7 @@ private:
     int hpi;        // humanPlayerIndex
     int dealer;
     int stateCode;  // 0, 1, 2, 3, 4
-    int commit[4] = {2, 0, 0, 0};  // Chips commitment of each round (2 means big blind)
+    int commit[4];  // Chips commitment of each round (2 means big blind)
     Position pos;
 
     int active;     // index: active player

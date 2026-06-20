@@ -26,10 +26,10 @@ int HumanPlayer::showActionMenu(const int& chipsToCall) const
     return action_type;
 }
 
-ACTION HumanPlayer::makeAction(const int& chipsToCall, int &betAmount)
+ACTION HumanPlayer::makeAction(const gameInfo& info, int &betAmount)
 {
     int k, ba;
-    switch (showActionMenu(chipsToCall))
+    switch (showActionMenu(info.chipsToCall))
     {
     case 1:
         k = Choice("Please Choose:", "123\x1b");
@@ -54,7 +54,7 @@ ACTION HumanPlayer::makeAction(const int& chipsToCall, int &betAmount)
         case '1':
             return FOLD;
         case '2':
-            decChips(chipsToCall);
+            decChips(info.chipsToCall);
             return CALL;
         case '4':
             betAmount = chips;
@@ -90,11 +90,11 @@ ACTION HumanPlayer::makeAction(const int& chipsToCall, int &betAmount)
 
     std::cout << "Bet Amount: " << std::flush;
     std::cin >> ba;
-    if (ba <= chipsToCall)
+    if (ba <= info.chipsToCall)
         throw Error(2, "User Error: Invalid betting scale.");
     if (ba >= chips) {betAmount=chips; setChips(0); return ALLIN;}
     betAmount = ba;
     decChips(betAmount);
-    if (chipsToCall > 0) return RAISE;
+    if (info.chipsToCall > 0) return RAISE;
     return BET;
 }

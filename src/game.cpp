@@ -72,23 +72,25 @@ void Game<NumT>::init_blinds() {
 
 template<typename NumT>
 void Game<NumT>::checkState() {
-    int i;
+    int i, n1 = 0, n2 = 0;
     for (i = 0; i < playerNum; i++)
     {
-        if (ftag[i] || atag[i]) continue;
-        if (!ctag[i]) break;
+        if (!ftag[i] && !atag[i]) n1++;    // 还在牌局中的玩家数
+        if (!ftag[i] && !atag[i] && !ctag[i]) n2++;  // 还在牌局中且没有check的玩家数
     }
-    if (i == playerNum) {   // 进入下一阶段
+    if (n1 < 1) { stateCode = 4; deck_.setShow(stateCode); return; }   // 当没有玩家时，游戏结束
+    if (n1 == 1 && n2 == 0) { stateCode = 4; deck_.setShow(stateCode); return; }   // 当只剩下一个非Allin玩家且非fold玩家，且check状态时，游戏结束
+    if (n1 > 1 && n2 == 0) {   // 当只剩多个非Allin玩家且非fold玩家，且全部check状态时，进入下一阶段
         stateCode++;
         deck_.setShow(stateCode);
         lastBet = -1;   // 清空lasetBet指针
-        for (int i = 0; i < playerNum; i++) // 清空check tags
-            if (!ftag[i])
-                ctag[i] = false;
+        for (int j = 0; j < playerNum; j++) // 清空check tags
+            if (!ftag[j])
+                ctag[j] = false;
         // 移动active指针到庄位后一位
         active = dealer;
-        step();
     }
+    step();
 }
 
 
@@ -287,7 +289,7 @@ void Game<NumT>::show(std::ostream& out) const {
         // 总投入筹码
         out << "\t" << getPlayerCommited(i);
         if (ftag[i])
-            out << "\t(fold)\t\t" << HandType<NumT>::evaluate(getHands(i));
+            out << "\t(fold)\t" << HandType<NumT>::evaluate(getHands(i));
         else
             out << "\t" << std::fixed << std::setprecision(2) << win_rate[i] << "%\t" << HandType<NumT>::evaluate(getHands(i));
         out << std::endl;
@@ -353,18 +355,6 @@ void Game<NumT>::fold() {
         return;
     }
     ftag[active] = 1;
-    // 当只剩下一个玩家时，游戏结束
-    int num = 0;
-    for (int i = 0; i < playerNum; i++)
-        if (!ftag[i]) num++;
-    if (num <= 1) { stateCode = 4; return;}
-    // 当只剩下Allin玩家和fold玩家时，游戏结束
-    num = 0;
-    for (int i = 0; i < playerNum; i++)
-        if (!ftag[i] && !atag[i]) num++;
-    if (num == 0) { stateCode = 4; return; }
-
-    step();
     checkState();
 }
 
@@ -372,12 +362,6 @@ template<typename NumT>
 void Game<NumT>::call() {
     chips[active][stateCode] = commit[stateCode];
     ctag[active] = true;
-    // call完发现只有自己非fold且非allin，游戏结束
-    int num = 0;
-    for (int i = 0; i < playerNum; i++)
-        if (!ftag[i] && !atag[i]) num++;
-    if (num <= 1) { stateCode = 4; deck_.setShow(stateCode); return; }
-    step();
     checkState();
 }
 
@@ -398,11 +382,6 @@ void Game<NumT>::bet(const int& chip) {
 template<typename NumT>
 void Game<NumT>::allin(const int& chip) {
     atag[active] = true;
-    // 当只剩下Allin玩家和fold玩家时，游戏结束
-    int num = 0;
-    for (int i = 0; i < playerNum; i++)
-        if (!ftag[i] && !atag[i]) num++;
-    if (num == 0) {stateCode = 4; deck_.setShow(stateCode); return; }
     // allin是特殊的bet
     bet(chip);
 }
@@ -412,13 +391,6 @@ void Game<NumT>::allinToCall(const int& chip) {
     ctag[active] = true;    // Allintocall将自己标记成为check tag, 同时不会清空他人的check tag
     atag[active] = true;
     chips[active][stateCode] += chip;
-    // commit[stateCode] = chips[active][stateCode];
-    // 当除了Allin玩家和fold玩家不足2人时，游戏结束
-    int num = 0;
-    for (int i = 0; i < playerNum; i++)
-        if (!ftag[i] && !atag[i]) num++;
-    if (num <= 1) {stateCode = 4; deck_.setShow(stateCode); return; }
-    step();
     checkState();
 }
 
@@ -426,8 +398,14 @@ template<typename NumT>
 void Game<NumT>::toAct() { // 玩家筹码修改在Player的makeAction中处理
     if (active != hpi)
         players[active]->setEquity(calcEquity(active, 12288));
-    int betAmount = getPot();  // betAmount先传入底池大小，后返回玩家下注金额
-    ACTION action = players[active]->makeAction(getChipsToCall(), betAmount);
+    gameInfo info {
+        .stateCode = stateCode,
+        .pot = getPot(),
+        .chipsToCall = getChipsToCall(),
+        .playerCommited = getPlayerCommited(active),
+    };
+    int betAmount = 0;
+    ACTION action = players[active]->makeAction(info, betAmount);
     players[active]->addActionHistory(actInfo{0, stateCode, action, betAmount});
     if (g_log) {
         std::string actStr = action2str(action);

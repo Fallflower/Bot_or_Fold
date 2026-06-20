@@ -9,7 +9,7 @@ private:
 public:
     HumanPlayer(const std::string &name, int startingChips) : Player(name, startingChips) {}
 
-    ACTION makeAction(const int& chipsToCall, int &betAmount) override;
+    ACTION makeAction(const gameInfo& info, int &betAmount) override;
 };
 
 

@@ -9,7 +9,7 @@ public:
     BotPlayer(const std::string &name, int startingChips) : Player(name, startingChips), equity(0) {}
 
     void setEquity(const double& eq) override { equity = eq; }
-    ACTION makeAction(const int& chipsToCall, int &betAmount) override;
+    ACTION makeAction(const gameInfo& info, int &betAmount) override;
 };
 
 

@@ -11,8 +11,9 @@ int getRandInt() {
     return intDist(gen);
 }
 
-ACTION BotPlayer::makeAction(const int& chipsToCall, int &betAmount) {
-    int pot = betAmount;                    // 传入时是底池大小
+ACTION BotPlayer::makeAction(const gameInfo& info, int &betAmount) {
+    int pot = info.pot;
+    int chipsToCall = info.chipsToCall;
     // 计算odd并化为百分数
     double potOdds = 100.0 * chipsToCall / (pot + chipsToCall);
 
