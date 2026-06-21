@@ -359,9 +359,11 @@ void Game<NumT>::fold() {
 }
 
 template<typename NumT>
-void Game<NumT>::call() {
-    chips[active][stateCode] = commit[stateCode];
+void Game<NumT>::call(const int& amount) {
+    chips[active][stateCode] += amount;
     ctag[active] = true;
+    if (players[active]->getChips() == 0)
+        atag[active] = true;
     checkState();
 }
 
@@ -376,53 +378,62 @@ void Game<NumT>::bet(const int& chip) {
     chips[active][stateCode] += chip;
     commit[stateCode] = chips[active][stateCode];
     lastBet = active;
+    if (players[active]->getChips() == 0)
+        atag[active] = true;
     step();
-}
-
-template<typename NumT>
-void Game<NumT>::allin(const int& chip) {
-    atag[active] = true;
-    // allin是特殊的bet
-    bet(chip);
-}
-
-template<typename NumT>
-void Game<NumT>::allinToCall(const int& chip) {
-    ctag[active] = true;    // Allintocall将自己标记成为check tag, 同时不会清空他人的check tag
-    atag[active] = true;
-    chips[active][stateCode] += chip;
-    checkState();
 }
 
 template<typename NumT>
 void Game<NumT>::toAct() { // 玩家筹码修改在Player的makeAction中处理
     if (active != hpi)
         players[active]->setEquity(calcEquity(active, 12288));
+
+    int chipsToCall = getChipsToCall();
+    int playerChips = players[active]->getChips();
+
+    // 计算还有几个非fold非allin的活跃玩家
+    int activePlayers = 0;
+    for (int i = 0; i < playerNum; i++)
+        if (!ftag[i] && !atag[i]) activePlayers++;
+    bool canRaise = activePlayers >= 2;  // 有对手才能下注/加注
+
+    // 由Game判断合法操作列表
+    std::vector<ACTION> legalActions;
+    if (chipsToCall == 0) {
+        legalActions.push_back(CHECK);
+        if (canRaise) legalActions.push_back(RAISE);
+    } else if (chipsToCall < playerChips) {
+        legalActions = {FOLD, CALL};
+        if (canRaise) legalActions.push_back(RAISE);
+    } else {
+        legalActions = {FOLD, CALL};  // CALL = 全下跟注
+    }
+
     gameInfo info {
         .stateCode = stateCode,
         .pot = getPot(),
-        .chipsToCall = getChipsToCall(),
+        .chipsToCall = chipsToCall,
         .playerCommited = getPlayerCommited(active),
+        .legalActions = legalActions
     };
     int betAmount = 0;
     ACTION action = players[active]->makeAction(info, betAmount);
     players[active]->addActionHistory(actInfo{0, stateCode, action, betAmount});
     if (g_log) {
         std::string actStr = action2str(action);
-        if (action == BET || action == RAISE)
+        if (action == RAISE)
             actStr += " " + std::to_string(betAmount);
         g_log->writeLine("  [" + std::string(stateStr[stateCode]) + "] " + players[active]->getName() + ": " + actStr);
     }
-    if (action == FOLD) {
-        fold();
-    } else if (action == CHECK || action == CALL) {
-        call();
-    } else if (action == BET || action == RAISE) {
-        bet(betAmount);
-    } else if (action == ALLIN) {
-        allin(betAmount);
-    } else if (action == ALLINTOCALL) {
-        allinToCall(betAmount);
+    switch (action) {
+    case FOLD:
+        fold(); break;
+    case CHECK:
+        call(0); break;
+    case CALL:
+        call(std::min(chipsToCall, playerChips)); break;
+    case RAISE:
+        bet(betAmount); break;
     }
 }
 

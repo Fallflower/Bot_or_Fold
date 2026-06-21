@@ -71,10 +71,8 @@ public:
     int getState() const { return stateCode; }
 
     void fold();
-    void call();
+    void call(const int&);
     void bet(const int&);
-    void allin(const int&);
-    void allinToCall(const int&);
 
     void toAct();
     void afterEnd();

@@ -8,14 +8,11 @@ enum ACTION {
 	FOLD,
 	CHECK,
 	CALL,
-	BET,
-	RAISE,
-	ALLIN,
-	ALLINTOCALL
+	RAISE
 };
 
 inline std::string action2str(const ACTION& action) {
-    static const std::string actionStr[] = {"Fold", "Check", "Call", "Bet", "Raise To", "All-in", "All-in to Call"};
+    static const std::string actionStr[] = {"Fold", "Check", "Call", "Raise"};
     return actionStr[action];
 }
 
@@ -38,6 +35,7 @@ struct gameInfo {
     int pot;             // 底池总筹码
     int chipsToCall;     // 需要跟注的金额
     int playerCommited;  // 当前玩家本轮已投入筹码
+    std::vector<ACTION> legalActions;  // 合法操作列表
 };
 
 class Player {

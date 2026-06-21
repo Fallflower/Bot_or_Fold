@@ -26,10 +26,10 @@ ACTION BotPlayer::makeAction(const gameInfo& info, int &betAmount) {
             if (betAmount >= chips) {
                 betAmount = chips;
                 setChips(0);
-                return ALLIN;
+                return RAISE;
             }
             decChips(betAmount);
-            return BET;
+            return RAISE;
         }
         return CHECK;
     }
@@ -38,14 +38,14 @@ ACTION BotPlayer::makeAction(const gameInfo& info, int &betAmount) {
         if (chips <= chipsToCall) { // 筹码不足果断allin
             betAmount = chips;
             setChips(0);
-            return ALLINTOCALL;
+            return CALL;
         }
         if (r < 80) {
             betAmount = chipsToCall * 3;
             if (betAmount >= chips) {
                 betAmount = chips;
                 setChips(0);
-                return ALLIN;
+                return RAISE;
             }
             decChips(betAmount);
             return RAISE;
@@ -62,7 +62,7 @@ ACTION BotPlayer::makeAction(const gameInfo& info, int &betAmount) {
             if (betAmount >= chips) {
                 betAmount = chips;
                 setChips(0);
-                return ALLIN;
+                return RAISE;
             }
             decChips(betAmount);
             return RAISE;
@@ -70,7 +70,7 @@ ACTION BotPlayer::makeAction(const gameInfo& info, int &betAmount) {
         if (chips <= chipsToCall) {
             betAmount = chips;
             setChips(0);
-            return ALLINTOCALL;
+            return CALL;
         }
         decChips(chipsToCall);
         return CALL;
@@ -84,7 +84,7 @@ ACTION BotPlayer::makeAction(const gameInfo& info, int &betAmount) {
             if (betAmount >= chips) {
                 betAmount = chips;
                 setChips(0);
-                return ALLIN;
+                return RAISE;
             }
             decChips(betAmount);
             return RAISE;

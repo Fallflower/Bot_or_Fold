@@ -1,100 +1,68 @@
 #include "humanPlayer.h"
 #include "assistant.h"
 
-int HumanPlayer::showActionMenu(const int& chipsToCall) const
-{
-    int action_type = 0;
-	std::cout << "==========================" << std::endl;
-    if(chipsToCall == 0) {
-	    std::cout << "=== Check          [1] ===" << std::endl;
-    	std::cout << "=== Bet            [2] ===" << std::endl;
-    	std::cout << "=== Allin          [3] ===" << std::endl;
-        action_type = 1;
-    } else if ( chipsToCall < chips) {
-        std::cout << "=== Fold           [1] ===" << std::endl;
-        std::cout << "=== Call  " << std::right << std::setw(5) << chipsToCall << " BB [2] ===" << std::endl;
-    	std::cout << "=== Raise          [3] ===" << std::endl;
-    	std::cout << "=== Allin          [4] ===" << std::endl;
-        action_type = 2;
-    } else {
-        std::cout << "=== Fold           [1] ===" << std::endl;
-        std::cout << "=== Allin to Call  [2] ===" << std::endl;
-        action_type = 3;
-    }
-	std::cout << "=== QUIT         [Esc] ===" << std::endl;
-	std::cout << "==========================" << std::endl;
-    return action_type;
-}
-
 ACTION HumanPlayer::makeAction(const gameInfo& info, int &betAmount)
 {
-    int k, ba;
-    switch (showActionMenu(info.chipsToCall))
-    {
-    case 1:
-        k = Choice("Please Choose:", "123\x1b");
-        switch (k) // 注意，所有的bet和raise都需要输入金额，统一到最后处理
-        {
-        case '1':
-            return CHECK;
-        case '3':
-            betAmount = chips;
-            setChips(0);
-            return ALLIN;
-        case '\x1b':
-            exit(0);
-        default:
-            break;
+    // 根据legalActions动态生成菜单
+    std::cout << "==========================" << std::endl;
+    int i = 1;
+    for (auto act : info.legalActions) {
+        switch (act) {
+        case FOLD:
+            std::cout << "=== Fold           [" << i << "] ===" << std::endl; break;
+        case CHECK:
+            std::cout << "=== Check          [" << i << "] ===" << std::endl; break;
+        case CALL:
+            std::cout << "=== Call  " << std::right << std::setw(5) << info.chipsToCall << " BB [" << i << "] ===" << std::endl; break;
+        case RAISE:
+            std::cout << "=== Raise          [" << i << "] ===" << std::endl; break;
         }
-        break;
-    case 2:
-        k = Choice("Please Choose:", "1234\x1b");
-        switch (k)
-        {
-        case '1':
-            return FOLD;
-        case '2':
-            decChips(info.chipsToCall);
-            return CALL;
-        case '4':
-            betAmount = chips;
-            setChips(0);
-            return ALLIN;
-        case '\x1b':
-            exit(0);
-        default:
-            break;
-        }
-        break;
-    case 3:
-        k = Choice("Please Choose:", "12\x1b");
-        switch (k)
-        {
-        case '1':
-            return CHECK;
-        case '2':
-            betAmount = chips;
-            setChips(0);
-            return ALLINTOCALL;
-        case '\x1b':
-            exit(0);
-        default:
-            break;
-        }
-        break;
-    case 0:
-        throw Error(3, "System Error: Invalid 'chipsToCall' value.");
-    default:
-        break;
+        i++;
     }
+    std::cout << "=== QUIT         [Esc] ===" << std::endl;
+    std::cout << "==========================" << std::endl;
 
-    std::cout << "Bet Amount: " << std::flush;
-    std::cin >> ba;
-    if (ba <= info.chipsToCall)
-        throw Error(2, "User Error: Invalid betting scale.");
-    if (ba >= chips) {betAmount=chips; setChips(0); return ALLIN;}
-    betAmount = ba;
-    decChips(betAmount);
-    if (info.chipsToCall > 0) return RAISE;
-    return BET;
+    // 构建选择字符串
+    std::string choices;
+    for (int j = 1; j < i; j++) choices += std::to_string(j)[0];
+    choices += "\x1b";
+
+    int k = Choice("Please Choose:", choices.c_str());
+    if (k == '\x1b') exit(0);
+
+    int idx = k - '1';
+    if (idx < 0 || idx >= (int)info.legalActions.size())
+        throw Error(3, "System Error: Invalid action selected.");
+
+    switch (info.legalActions[idx]) {
+    case FOLD:
+        return FOLD;
+    case CHECK:
+        return CHECK;
+    case CALL: {
+        // 后手不够叫则全下跟注，否则正常跟注
+        if (info.chipsToCall >= chips) {
+            betAmount = chips;
+            setChips(0);
+        } else {
+            decChips(info.chipsToCall);
+        }
+        return CALL;
+    }
+    case RAISE: {
+        int minRaise = (info.chipsToCall > 0) ? info.chipsToCall * 2 : 1;
+        std::cout << "Bet Amount (min " << minRaise << "): " << std::flush;
+        std::cin >> betAmount;
+        if (betAmount < minRaise)
+            throw Error(2, "User Error: Invalid betting scale.");
+        if (betAmount >= chips) {
+            betAmount = chips;
+            setChips(0);
+        } else {
+            decChips(betAmount);
+        }
+        return RAISE;
+    }
+    }
+    return FOLD;
 }
