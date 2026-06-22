@@ -54,7 +54,7 @@ void Game<NumT>::reset_tags() {
 template<typename NumT>
 void Game<NumT>::init_players(const HumanPlayer& p, const int& c) {
     for (int i = 1; i < playerNum; i++)
-        players.push_back(std::make_unique<BotPlayer>("BotPlayer"+std::to_string(i), c));
+        players.push_back(std::make_unique<LLMPlayer>("LLMPlayer"+std::to_string(i), c));
     players.insert(players.begin() + hpi, std::make_unique<HumanPlayer>(p));
 }
 
@@ -95,7 +95,7 @@ void Game<NumT>::checkState() {
 
 
 template<typename NumT>
-std::vector<Card<NumT>> Game<NumT>::getHands(const int& k) const {
+const std::vector<Card<NumT>> Game<NumT>::getHands(const int& k) const {
     std::vector<Card<NumT>> temp;
     int sc = stateCode > 3 ? 3 : stateCode;
     if (sc) {
@@ -107,18 +107,7 @@ std::vector<Card<NumT>> Game<NumT>::getHands(const int& k) const {
 }
 
 template<typename NumT>
-std::vector<Card<NumT>> Game<NumT>::getKnownPubCards() const {
-    std::vector<Card<NumT>> temp = {};
-    int sc = stateCode > 3 ? 3 : stateCode;
-    if (sc) {
-        const auto& pub = deck_.getPubCards();
-        temp.assign(pub.begin(), pub.end() - 3 + sc);
-    }
-    return temp;
-}
-
-template<typename NumT>
-std::vector<Card<NumT>> Game<NumT>::getFinalHands(const int& k) const {
+const std::vector<Card<NumT>> Game<NumT>::getFinalHands(const int& k) const {
     std::vector<Card<NumT>> temp;
     const auto& pub = deck_.getPubCards();
     temp.assign(pub.begin(), pub.end());
@@ -385,8 +374,6 @@ void Game<NumT>::bet(const int& chip) {
 
 template<typename NumT>
 void Game<NumT>::toAct() { // 玩家筹码修改在Player的makeAction中处理
-    if (active != hpi)
-        players[active]->setEquity(calcEquity(active, 12288));
 
     int chipsToCall = getChipsToCall();
     int playerChips = players[active]->getChips();
@@ -409,11 +396,22 @@ void Game<NumT>::toAct() { // 玩家筹码修改在Player的makeAction中处理
         legalActions = {FOLD, CALL};  // CALL = 全下跟注
     }
 
+    std::string pubCardsStr = "";
+    for (auto c : getKnownPubCards())
+        pubCardsStr += c.toString() + " ";
+
     gameInfo info {
+        .playerNum = playerNum,
+        .remainPlayerNum = activePlayers,
         .stateCode = stateCode,
         .pot = getPot(),
         .chipsToCall = chipsToCall,
         .playerCommited = getPlayerCommited(active),
+        .winRate = calcEquity(active, 12288),
+        .positionStr = pos[active],
+        .handCardsStr = hands[active][0].toString() + " " + hands[active][1].toString(),
+        .publicCardsStr = pubCardsStr,
+        .handTypeStr = HandType<NumT>::evaluate(getHands(active)).to_string(),
         .legalActions = legalActions
     };
     int betAmount = 0;
@@ -458,8 +456,7 @@ void Game<NumT>::afterEnd() {
 
     // 日志文件：详细上帝视角
     if (g_log) {
-        g_log->writeLine("");
-        g_log->writeLine("Game Over! Final Results:");
+        g_log->writeLine("\nGame Over! Final Results:");
         show(g_log->stream());
         for (size_t i = 0; i < winners.size(); i++)
             g_log->writeLine(std::string(players[winners[i]]->getName()) + " won " + std::to_string(share) + " chips");

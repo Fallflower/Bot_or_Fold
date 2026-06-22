@@ -31,10 +31,17 @@ inline std::ostream &operator<<(std::ostream &out, const actInfo& t) {
 }
 
 struct gameInfo {
+	int playerNum;	   	 // 玩家数量
+	int remainPlayerNum; // 剩余玩家数
     int stateCode;       // 轮次: 0=preflop, 1=flop, 2=turn, 3=river
     int pot;             // 底池总筹码
     int chipsToCall;     // 需要跟注的金额
     int playerCommited;  // 当前玩家本轮已投入筹码
+	double winRate;      // 当前玩家胜率（百分数）
+	std::string positionStr;  // 当前玩家位置
+    std::string handCardsStr; // 当前玩家的手牌字符串 (e.g. "A♠ K♥")
+	std::string publicCardsStr; // 已发公共牌字符串 (e.g. "Flop: 10♦ J♦ Q♦")
+    std::string handTypeStr; // 当前玩家的牌型描述 (e.g. "Pair: A (kicker K)")
     std::vector<ACTION> legalActions;  // 合法操作列表
 };
 
@@ -48,7 +55,6 @@ protected:
 	void decChips(const int& amount) {chips -= amount;}
 	void addChips(const int& amount) {chips += amount;}
 	void setChips(const int& amount) {chips = amount; }
-	virtual void setEquity(const double&) {};
 	virtual ACTION makeAction(const gameInfo&, int &) = 0;
 
 	void addActionHistory(const actInfo& act) { actionHistory.push_back(act); }

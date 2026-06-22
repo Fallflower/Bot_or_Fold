@@ -4,11 +4,9 @@
 #include "player.h"
 
 class BotPlayer : public Player {
-    double equity = 0;
 public:
-    BotPlayer(const std::string &name, int startingChips) : Player(name, startingChips), equity(0) {}
+    BotPlayer(const std::string &name, int startingChips) : Player(name, startingChips) {}
 
-    void setEquity(const double& eq) override { equity = eq; }
     ACTION makeAction(const gameInfo& info, int &betAmount) override;
 };
 

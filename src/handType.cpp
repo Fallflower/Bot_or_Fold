@@ -23,37 +23,42 @@ std::string HandType<NumT>::to_string() const {
     switch (rank)
     {
     case HIGH_CARD:
-        temp = std::string("高牌")+num2str(keys[0]);
+        temp = std::string("High: ") + num2str(keys[0]);
         break;
     case ONE_PAIR:
+        temp = std::string("Pair: ") + num2str(keys[0]);
         if (keys.size() > 1)
-            temp = std::string("对")+num2str(keys[0])+" "+num2str(keys[1])+"踢";
-        else
-            temp = std::string("对")+num2str(keys[0]);
+            temp += " (kicker " + num2str(keys[1]) + ")";
         break;
     case TWO_PAIR:
-        temp = std::string("对")+num2str(keys[0])+"对"+num2str(keys[1])+" "+num2str(keys[2])+"踢";
+        temp = std::string("Two Pair: ") + num2str(keys[0]) + " " + num2str(keys[1]);
+        if (keys.size() > 2)
+            temp += " (kicker " + num2str(keys[2]) + ")";
         break;
     case THREE_OF_A_KIND:
-        temp = std::string("三条")+num2str(keys[0])+" "+num2str(keys[1])+"踢";
+        temp = std::string("Trips: ") + num2str(keys[0]);
+        if (keys.size() > 1)
+            temp += " (kicker " + num2str(keys[1]) + ")";
         break;
     case STRAIGHT:
-        temp = std::string("顺子")+num2str(keys[0]);
+        temp = std::string("Straight: ") + num2str(keys[0]) + "-high";
         break;
     case FLUSH:
-        temp = std::string("同花")+num2str(keys[0]);
+        temp = std::string("Flush: ") + num2str(keys[0]) + "-high";
         break;
     case FULL_HOUSE:
-        temp = num2str(keys[0])+" "+num2str(keys[1])+"的葫芦";
+        temp = std::string("Full House: ") + num2str(keys[0]) + " over " + num2str(keys[1]);
         break;
     case FOUR_OF_A_KIND:
-        temp = std::string("四条")+num2str(keys[0])+" "+num2str(keys[1])+"踢";
+        temp = std::string("Quads: ") + num2str(keys[0]);
+        if (keys.size() > 1)
+            temp += " (kicker " + num2str(keys[1]) + ")";
         break;
     case STRAIGHT_FLUSH:
         if (keys[0] == static_cast<NumT>(NumT::ACE))
-            temp = "皇家同花顺";
+            temp = "Royal Flush";
         else
-            temp = std::string("同花顺")+num2str(keys[0]);
+            temp = std::string("Straight Flush: ") + num2str(keys[0]) + "-high";
         break;
     default:
         break;

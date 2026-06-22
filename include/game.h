@@ -6,6 +6,7 @@
 #include "position.h"
 #include "humanPlayer.h"
 #include "botPlayer.h"
+#include "llmPlayer.h"
 #include "gameLog.h"
 #include <memory>
 #include <iostream>
@@ -52,9 +53,14 @@ private:
         while (ftag[active] || atag[active]) active = (active + 1) % playerNum;
     }
 
-    std::vector<Card<NumT>> getHands(const int&) const;   // 3/4/5 + 2
-    std::vector<Card<NumT>> getFinalHands(const int&) const;  // 5 + 2
-    std::vector<Card<NumT>> getKnownPubCards() const;         // 3/4/5
+    const std::vector<Card<NumT>> getHands(const int&) const;   // 3/4/5 + 2
+    const std::vector<Card<NumT>> getFinalHands(const int&) const;  // 5 + 2
+    const std::vector<Card<NumT>> getKnownPubCards() const {        // 3/4/5
+        std::vector<Card<NumT>> temp;
+        for (auto c:deck_.getPubCards())
+            if (c.show) temp.push_back(c);
+        return temp;
+    }
 
     double calcEquity(const int&, const int& = 12288) const;  // 计算玩家视角的胜率，返回百分数
     std::vector<double> calcWinRate(const int& simulations = 12288) const;  // 返回上帝视角所有玩家胜率百分数

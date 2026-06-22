@@ -21,7 +21,7 @@ ACTION BotPlayer::makeAction(const gameInfo& info, int &betAmount) {
 
     // 无人下注时偶尔诈唬，牌力够强时主动找价值
     if (chipsToCall == 0) {
-        if (r < 8 || equity > 60) {
+        if (r < 8 || info.winRate > 60) {
             betAmount = (int)(pot * 0.7);
             if (betAmount >= chips) {
                 betAmount = chips;
@@ -33,7 +33,7 @@ ACTION BotPlayer::makeAction(const gameInfo& info, int &betAmount) {
         }
         return CHECK;
     }
-    if (equity > 60) {
+    if (info.winRate > 60) {
         // 强牌: 80%加注, 20%跟注
         if (chips <= chipsToCall) { // 筹码不足果断allin
             betAmount = chips;
@@ -54,7 +54,7 @@ ACTION BotPlayer::makeAction(const gameInfo& info, int &betAmount) {
         return CALL;
     }
 
-    if (equity > potOdds + 5) {
+    if (info.winRate > potOdds + 5) {
         // 有利可图: 跟注为主, 15%半诈唬
         if (chips <= chipsToCall) return FOLD; // 筹码不足果断fold
         if (r < 15) {
@@ -76,7 +76,7 @@ ACTION BotPlayer::makeAction(const gameInfo& info, int &betAmount) {
         return CALL;
     }
 
-    if (equity < potOdds) {
+    if (info.winRate < potOdds) {
         // 不好摊牌，偶尔bluff
         if (chips <= chipsToCall) return FOLD; // 筹码不足果断fold
         if (r < 10) {
