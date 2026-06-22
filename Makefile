@@ -16,8 +16,7 @@ else
 endif
 
 # CFLAGS = -std=c++17 -g   # for debug
-CURL_DIR = C:/Users/xy673/Documents/Cpp_libs/curl-win64-mingw
-CFLAGS = -Wall -Wextra -std=c++17 -MMD -MP -Iinclude -I$(CURL_DIR)/include
+CFLAGS = -Wall -Wextra -std=c++17 -MMD -MP -Iinclude
 targets = main$(TARGET_EXT)
 BUILD_DIR = build
 
@@ -36,10 +35,8 @@ run: $(targets)
 $(BUILD_DIR):
 	$(MKDIR) $(BUILD_DIR)
 
-LDLIBS = -L$(CURL_DIR)/lib -lcurl -lssl -lcrypto -lz -lssh2 -lnghttp2 -lbrotlicommon -lbrotlidec -lzstd -lpsl
-
 $(targets): $(objects)
-	$(CXX) $(CFLAGS) $^ -o $@ $(LDLIBS)
+	$(CXX) $(CFLAGS) $^ -o $@
 
 $(BUILD_DIR)/%.o: %.cpp | $(BUILD_DIR)
 	$(CXX) $(CFLAGS) -c $< -o $@
