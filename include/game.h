@@ -6,7 +6,6 @@
 #include "position.h"
 #include "humanPlayer.h"
 #include "botPlayer.h"
-#include "llmPlayer.h"
 #include "gameLog.h"
 #include <memory>
 #include <iostream>

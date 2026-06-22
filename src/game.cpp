@@ -54,7 +54,7 @@ void Game<NumT>::reset_tags() {
 template<typename NumT>
 void Game<NumT>::init_players(const HumanPlayer& p, const int& c) {
     for (int i = 1; i < playerNum; i++)
-        players.push_back(std::make_unique<LLMPlayer>("LLMPlayer"+std::to_string(i), c));
+        players.push_back(std::make_unique<BotPlayer>("BotPlayer"+std::to_string(i), c));
     players.insert(players.begin() + hpi, std::make_unique<HumanPlayer>(p));
 }
 
