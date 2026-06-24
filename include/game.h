@@ -20,7 +20,7 @@ private:
     Deck<NumT> deck_;
 
     int playerNum;
-    std::vector<std::unique_ptr<Player>> players;
+    std::vector<std::unique_ptr<Player<NumT>>> players;
     int inic;       // initial chips
     int hpi;        // humanPlayerIndex
     int dealer;
@@ -34,10 +34,12 @@ private:
     bool *ftag;     // fold tags
     bool *ctag;     // check tags
     bool *atag;     // all-in tags
+    int raiseCount; // 当前轮的加注次数（0=none\blind, 1=open, 2=3-bet, ...)
+    std::vector<actInfo> roundHistory;
 
     void init_game();
     void reset_tags();
-    void init_players(const HumanPlayer&, const int&);
+    void init_players(const HumanPlayer<NumT>&, const int&);
     void init_blinds();
     void checkState();
 
@@ -66,7 +68,7 @@ private:
     std::vector<int> checkWinner(const std::vector<std::vector<Card<NumT>>>& hands, const std::vector<Card<NumT>>& publicCards) const; // 判断特定输入的玩家手牌组合下的赢家
 public:
     Game(int pn = 3, int d = 0);
-    Game(const Position& posInfo, const int& initialChips, const HumanPlayer& humanPlayer, const int &humanPlayerPosIndex);
+    Game(const Position& posInfo, const int& initialChips, const HumanPlayer<NumT>& humanPlayer, const int &humanPlayerPosIndex);
     ~Game();
 
     void show(std::ostream& out = std::cout) const;

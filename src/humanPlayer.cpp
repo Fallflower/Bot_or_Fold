@@ -1,7 +1,8 @@
 #include "humanPlayer.h"
 #include "assistant.h"
 
-ACTION HumanPlayer::makeAction(const gameInfo& info, int &betAmount)
+template<typename NumT>
+ACTION HumanPlayer<NumT>::makeAction(const gameInfo<NumT>& info, int &betAmount)
 {
     // 根据legalActions动态生成菜单
     std::cout << "==========================" << std::endl;
@@ -41,11 +42,11 @@ ACTION HumanPlayer::makeAction(const gameInfo& info, int &betAmount)
         return CHECK;
     case CALL: {
         // 后手不够叫则全下跟注，否则正常跟注
-        if (info.chipsToCall >= chips) {
-            betAmount = chips;
-            setChips(0);
+        if (info.chipsToCall >= this->chips) {
+            betAmount = this->chips;
+            this->setChips(0);
         } else {
-            decChips(info.chipsToCall);
+            this->decChips(info.chipsToCall);
         }
         return CALL;
     }
@@ -55,14 +56,17 @@ ACTION HumanPlayer::makeAction(const gameInfo& info, int &betAmount)
         std::cin >> betAmount;
         if (betAmount < minRaise)
             throw Error(2, "User Error: Invalid betting scale.");
-        if (betAmount >= chips) {
-            betAmount = chips;
-            setChips(0);
+        if (betAmount >= this->chips) {
+            betAmount = this->chips;
+            this->setChips(0);
         } else {
-            decChips(betAmount);
+            this->decChips(betAmount);
         }
         return RAISE;
     }
     }
     return FOLD;
 }
+
+template class HumanPlayer<CARDNUM>;
+template class HumanPlayer<SHORT_CARDNUM>;

@@ -2,6 +2,7 @@
 #define __PLAYER_H__
 
 #include "card.h"
+#include "handType.h"
 #include <vector>
 
 enum ACTION {
@@ -30,6 +31,7 @@ inline std::ostream &operator<<(std::ostream &out, const actInfo& t) {
 	return out;
 }
 
+template<typename NumT = CARDNUM>
 struct gameInfo {
 	int playerNum;	   	 // 玩家数量
 	int remainPlayerNum; // 剩余玩家数
@@ -39,12 +41,15 @@ struct gameInfo {
     int playerCommited;  // 当前玩家本轮已投入筹码
 	double winRate;      // 当前玩家胜率（百分数）
 	std::string positionStr;  // 当前玩家位置
-    std::string handCardsStr; // 当前玩家的手牌字符串 (e.g. "A♠ K♥")
-	std::string publicCardsStr; // 已发公共牌字符串 (e.g. "Flop: 10♦ J♦ Q♦")
-    std::string handTypeStr; // 当前玩家的牌型描述 (e.g. "Pair: A (kicker K)")
+    std::vector<Card<NumT>> handCards;  // 当前玩家的手牌
+    std::vector<Card<NumT>> publicCards; // 已发公共牌
+    HandType<NumT> handType;  // 当前玩家的牌型
     std::vector<ACTION> legalActions;  // 合法操作列表
+    int raiseCount;                      // 当前街的加注次数
+    std::vector<actInfo> roundHistory;   // 当前街的操作历史（不含当前待做的操作）
 };
 
+template<typename NumT = CARDNUM>
 class Player {
 	template<typename> friend class Game;
 protected:
@@ -55,7 +60,7 @@ protected:
 	void decChips(const int& amount) {chips -= amount;}
 	void addChips(const int& amount) {chips += amount;}
 	void setChips(const int& amount) {chips = amount; }
-	virtual ACTION makeAction(const gameInfo&, int &) = 0;
+	virtual ACTION makeAction(const gameInfo<NumT>&, int &) = 0;
 
 	void addActionHistory(const actInfo& act) { actionHistory.push_back(act); }
 public:

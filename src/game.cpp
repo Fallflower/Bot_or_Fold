@@ -49,13 +49,15 @@ void Game<NumT>::reset_tags() {
         ctag[i] = false;
         atag[i] = false;
     }
+    raiseCount = 0;
+    roundHistory.clear();
 }
 
 template<typename NumT>
-void Game<NumT>::init_players(const HumanPlayer& p, const int& c) {
+void Game<NumT>::init_players(const HumanPlayer<NumT>& p, const int& c) {
     for (int i = 1; i < playerNum; i++)
-        players.push_back(std::make_unique<BotPlayer>("BotPlayer"+std::to_string(i), c));
-    players.insert(players.begin() + hpi, std::make_unique<HumanPlayer>(p));
+        players.push_back(std::make_unique<BotPlayer<NumT>>("BotPlayer"+std::to_string(i), c));
+    players.insert(players.begin() + hpi, std::make_unique<HumanPlayer<NumT>>(p));
 }
 
 template<typename NumT>
@@ -82,6 +84,8 @@ void Game<NumT>::checkState() {
     if (n1 == 1 && n2 == 0) { stateCode = 4; deck_.setShow(stateCode); return; }   // 当只剩下一个非Allin玩家且非fold玩家，且check状态时，游戏结束
     if (n1 > 1 && n2 == 0) {   // 当只剩多个非Allin玩家且非fold玩家，且全部check状态时，进入下一阶段
         stateCode++;
+        raiseCount = 0;
+        roundHistory.clear();
         deck_.setShow(stateCode);
         lastBet = -1;   // 清空lasetBet指针
         for (int j = 0; j < playerNum; j++) // 清空check tags
@@ -218,15 +222,15 @@ std::vector<int> Game<NumT>::checkWinner(const std::vector<std::vector<Card<NumT
 }
 
 template<typename NumT>
-Game<NumT>::Game(int pn, int d): playerNum(pn), dealer(d), stateCode(0) {
+Game<NumT>::Game(int pn, int d): playerNum(pn), dealer(d), stateCode(0), raiseCount(0) {
     init_game();
     deck_.shuffle();
     deck_.deal(playerNum, hands);
 }
 
 template<typename NumT>
-Game<NumT>::Game(const Position& p,const int& c, const HumanPlayer& hp, const int& hppi)
-: playerNum(p.getPlayerNum()), inic(c), hpi(hppi), dealer(p.getDealer()), stateCode(0), pos(p) {
+Game<NumT>::Game(const Position& p,const int& c, const HumanPlayer<NumT>& hp, const int& hppi)
+: playerNum(p.getPlayerNum()), inic(c), hpi(hppi), dealer(p.getDealer()), stateCode(0), pos(p), raiseCount(0), roundHistory(std::vector<actInfo>()) {
     init_game();
     init_players(hp, c);
     init_blinds();
@@ -369,6 +373,7 @@ void Game<NumT>::bet(const int& chip) {
     lastBet = active;
     if (players[active]->getChips() == 0)
         atag[active] = true;
+    raiseCount++;
     step();
 }
 
@@ -376,31 +381,26 @@ template<typename NumT>
 void Game<NumT>::toAct() { // 玩家筹码修改在Player的makeAction中处理
 
     int chipsToCall = getChipsToCall();
-    int playerChips = players[active]->getChips();
 
     // 计算还有几个非fold非allin的活跃玩家
     int activePlayers = 0;
     for (int i = 0; i < playerNum; i++)
         if (!ftag[i] && !atag[i]) activePlayers++;
-    bool canRaise = activePlayers >= 2;  // 有对手才能下注/加注
+    // bool canRaise = activePlayers >= 1;  // 有对手才能下注/加注
 
     // 由Game判断合法操作列表
     std::vector<ACTION> legalActions;
     if (chipsToCall == 0) {
-        legalActions.push_back(CHECK);
-        if (canRaise) legalActions.push_back(RAISE);
+        legalActions = {CHECK, RAISE};
+        // if (canRaise) legalActions.push_back(RAISE);
     } else if (chipsToCall < playerChips) {
-        legalActions = {FOLD, CALL};
-        if (canRaise) legalActions.push_back(RAISE);
+        legalActions = {FOLD, CALL, RAISE};
+        // if (canRaise) legalActions.push_back(RAISE);
     } else {
         legalActions = {FOLD, CALL};  // CALL = 全下跟注
     }
 
-    std::string pubCardsStr = "";
-    for (auto c : getKnownPubCards())
-        pubCardsStr += c.toString() + " ";
-
-    gameInfo info {
+    gameInfo<NumT> info {
         .playerNum = playerNum,
         .remainPlayerNum = activePlayers,
         .stateCode = stateCode,
@@ -409,14 +409,17 @@ void Game<NumT>::toAct() { // 玩家筹码修改在Player的makeAction中处理
         .playerCommited = getPlayerCommited(active),
         .winRate = calcEquity(active, 12288),
         .positionStr = pos[active],
-        .handCardsStr = hands[active][0].toString() + " " + hands[active][1].toString(),
-        .publicCardsStr = pubCardsStr,
-        .handTypeStr = HandType<NumT>::evaluate(getHands(active)).to_string(),
-        .legalActions = legalActions
+        .handCards = hands[active],
+        .publicCards = getKnownPubCards(),
+        .handType = HandType<NumT>::evaluate(getHands(active)),
+        .legalActions = legalActions,
+        .raiseCount = raiseCount,
+        .roundHistory = roundHistory
     };
     int betAmount = 0;
     ACTION action = players[active]->makeAction(info, betAmount);
-    players[active]->addActionHistory(actInfo{0, stateCode, action, betAmount});
+    players[active]->addActionHistory(actInfo{active, stateCode, action, betAmount});
+    roundHistory.push_back(actInfo{active, stateCode, action, betAmount});
     if (g_log) {
         std::string actStr = action2str(action);
         if (action == RAISE)

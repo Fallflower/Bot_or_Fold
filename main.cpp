@@ -8,7 +8,7 @@ void runGame(Position& pos, int chips, const std::string& name, int hppi) {
     GameLog log("game_log2.txt");
     g_log = &log;
 
-    Game<NumT> g(pos, chips, HumanPlayer(name, chips), hppi);
+    Game<NumT> g(pos, chips, HumanPlayer<NumT>(name, chips), hppi);
 
     try {
         int flag = 1;

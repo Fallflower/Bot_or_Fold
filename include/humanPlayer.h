@@ -3,11 +3,12 @@
 
 #include "player.h"
 
-class HumanPlayer : public Player {
+template<typename NumT = CARDNUM>
+class HumanPlayer : public Player<NumT> {
 public:
-    HumanPlayer(const std::string &name, int startingChips) : Player(name, startingChips) {}
+    HumanPlayer(const std::string &name, int startingChips) : Player<NumT>(name, startingChips) {}
 
-    ACTION makeAction(const gameInfo& info, int &betAmount) override;
+    ACTION makeAction(const gameInfo<NumT>& info, int &betAmount) override;
 };
 
 
