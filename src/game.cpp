@@ -325,8 +325,12 @@ void Game<NumT>::showPlayerView(std::ostream& out) const {
     }
 
     out << "================================================================" << std::endl;
-    if (active != hpi)
+    if (active != hpi)  // 非人类玩家行动时，显示思考提示
         out << players[active]->getName() << " is thinking..." << std::endl;
+    else if (roundHistory.size() > 0) { // 人类玩家时，显示上次操作
+        const actInfo aif = roundHistory.back();
+        out << players[aif.id]->getName() << "\t" << aif << std::endl;
+    }
 }
 
 template<typename NumT>
@@ -381,6 +385,7 @@ template<typename NumT>
 void Game<NumT>::toAct() { // 玩家筹码修改在Player的makeAction中处理
 
     int chipsToCall = getChipsToCall();
+    int playerChips = players[active]->getChips();
 
     // 计算还有几个非fold非allin的活跃玩家
     int activePlayers = 0;

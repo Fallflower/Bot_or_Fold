@@ -36,16 +36,6 @@ HandTier BotPlayer<NumT>::getTier(int score) const {
     return TIER_TRASH;
 }
 
-template<typename NumT>
-bool BotPlayer<NumT>::isLatePosition(const std::string& pos) const {
-    return pos.find("D ") != std::string::npos || pos.find("C O") != std::string::npos;
-}
-
-template<typename NumT>
-bool BotPlayer<NumT>::isBlind(const std::string& pos) const {
-    return pos.find("SB") != std::string::npos || pos.find("BB") != std::string::npos;
-}
-
 // ============================================================
 //                   Entry point
 // ============================================================
@@ -61,13 +51,14 @@ ACTION BotPlayer<NumT>::makeAction(const gameInfo<NumT>& info, int &betAmount) {
 // ============================================================
 template<typename NumT>
 ACTION BotPlayer<NumT>::actPreflop(const gameInfo<NumT>& info, int &betAmount) {
+    // ---- Abstract information ----
     int score = calcPreflopScore(info);
     HandTier tier = getTier(score);
     int ctc = info.chipsToCall;
     int myChips = this->chips;
-    bool lp = isLatePosition(info.positionStr);
-    bool sb = info.positionStr.find("SB") != std::string::npos;
-    bool bb = info.positionStr.find("BB") != std::string::npos;
+    bool lp = info.positionStr == " C O " || info.positionStr == "  D  ";
+    bool sb = info.positionStr == " S B ";
+    bool bb = info.positionStr == " B B ";
 
     // ---- Scenario A: can check for free (BB with no raise) ----
     if (ctc == 0) {
@@ -149,6 +140,7 @@ ACTION BotPlayer<NumT>::actPostflop(const gameInfo<NumT>& info, int &betAmount) 
     int pot = info.pot;
     int myChips = this->chips;
     double wr = info.winRate;
+    bool lp = info.positionStr == " C O " || info.positionStr == "  D  ";
 
     // ---- Checked to me ----
     if (ctc == 0) {
@@ -163,7 +155,7 @@ ACTION BotPlayer<NumT>::actPostflop(const gameInfo<NumT>& info, int &betAmount) 
             this->decChips(betSz); betAmount = betSz; return RAISE;
         }
         if (wr > 40) {
-            if (isLatePosition(info.positionStr) && pct() < 30) {
+            if (lp && pct() < 30) {
                 int betSz = std::max((int)(pot * 0.4), 2);
                 if (betSz >= myChips) { this->setChips(0); betAmount = myChips; return RAISE; }
                 this->decChips(betSz); betAmount = betSz; return RAISE;
@@ -205,7 +197,7 @@ ACTION BotPlayer<NumT>::actPostflop(const gameInfo<NumT>& info, int &betAmount) 
     }
 
     if (wr > potOdds - 8) {
-        if (pct() < 10 && isLatePosition(info.positionStr)) {
+        if (pct() < 10 && lp) {
             int raiseAmt = std::min(ctc * 3, myChips);
             if (raiseAmt >= myChips) { this->setChips(0); betAmount = myChips; return RAISE; }
             this->decChips(raiseAmt); betAmount = raiseAmt; return RAISE;

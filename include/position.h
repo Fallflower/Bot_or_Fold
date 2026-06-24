@@ -33,6 +33,9 @@ public:
 
     std::string operator[](int pi) const;
 
+    bool isBlind(int pi) const;
+    bool isLatePosition(int pi) const;
+
     std::ostream& output(std::ostream& out) const;
 };
 

@@ -21,8 +21,6 @@ public:
 private:
     int calcPreflopScore(const gameInfo<NumT>& info) const;
     HandTier getTier(int score) const;
-    bool isLatePosition(const std::string& pos) const;
-    bool isBlind(const std::string& pos) const;
 
     ACTION actPreflop(const gameInfo<NumT>& info, int &betAmount);
     ACTION actPostflop(const gameInfo<NumT>& info, int &betAmount);
