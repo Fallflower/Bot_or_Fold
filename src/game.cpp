@@ -344,14 +344,13 @@ int Game<NumT>::getPot() const {
 
 template<typename NumT>
 void Game<NumT>::fold() {
-    if (hpi == active) {    // 唯一的人类玩家选择弃牌，游戏结束
-        std::cout << "You folded. Better luck next time!" << std::endl;
-        stateCode = 4;
-        deck_.setShow(stateCode);
-        ftag[hpi] = 1;
-        return;
-    }
     ftag[active] = 1;
+    // if (hpi == active) {    // 唯一的人类玩家选择弃牌，游戏结束
+    //     std::cout << "You folded. Better luck next time!" << std::endl;
+    //     stateCode = 4;
+    //     deck_.setShow(stateCode);
+    //     return;
+    // }
     checkState();
 }
 
