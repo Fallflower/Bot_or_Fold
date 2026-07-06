@@ -10,6 +10,11 @@
 #include <memory>
 #include <iostream>
 
+struct SidePot {
+    int amount;
+    std::vector<int> eligiblePlayers;
+};
+
 extern const std::string stateStr[];
 
 template<typename NumT = CARDNUM>
@@ -66,6 +71,7 @@ private:
     double calcEquity(const int&, const int& = 12288) const;  // 计算玩家视角的胜率，返回百分数
     std::vector<double> calcWinRate(const int& simulations = 12288) const;  // 返回上帝视角所有玩家胜率百分数
     std::vector<int> checkWinner(const std::vector<std::vector<Card<NumT>>>& hands, const std::vector<Card<NumT>>& publicCards) const; // 判断特定输入的玩家手牌组合下的赢家
+    std::vector<int> getWinners(const std::vector<int>& eligiblePlayers) const;  // 计算 eligiblePlayers 中的赢家
 public:
     Game(int pn = 3, int d = 0);
     Game(const Position& posInfo, const int& initialChips, const HumanPlayer<NumT>& humanPlayer, const int &humanPlayerPosIndex);
@@ -87,6 +93,7 @@ public:
 
     bool isEnd() const { return stateCode > 3; }
     Position getPosiInfo() const { return pos; }
+    std::vector<SidePot> calculateSidePots() const;  // 计算所有边池（含主池）
 
 };
 #endif
