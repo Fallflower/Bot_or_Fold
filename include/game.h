@@ -40,7 +40,6 @@ private:
     bool *ctag;     // check tags
     bool *atag;     // all-in tags
     int raiseCount; // 当前轮的加注次数（0=none\blind, 1=open, 2=3-bet, ...)
-    std::vector<actInfo> roundHistory;
 
     void init_game();
     void reset_tags();

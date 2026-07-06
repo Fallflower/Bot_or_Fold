@@ -46,7 +46,6 @@ struct gameInfo {
     HandType<NumT> handType;  // 当前玩家的牌型
     std::vector<ACTION> legalActions;  // 合法操作列表
     int raiseCount;                      // 当前街的加注次数
-    std::vector<actInfo> roundHistory;   // 当前街的操作历史（不含当前待做的操作）
 };
 
 template<typename NumT = CARDNUM>

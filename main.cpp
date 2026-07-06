@@ -5,7 +5,7 @@
 
 template<typename NumT>
 void runGame(Position& pos, int chips, const std::string& name, int hppi) {
-    GameLog log("game_log3.txt");
+    GameLog log("game_log4.txt");
     g_log = &log;
 
     Game<NumT> g(pos, chips, HumanPlayer<NumT>(name, chips), hppi);
@@ -40,7 +40,7 @@ void runGame(Position& pos, int chips, const std::string& name, int hppi) {
     } catch (const Error& e) {
         std::cerr << e.what() << std::endl;
         g.show();
-        log.writeLine(std::string("=== Error: ") + e.what() + " ===");
+        log.writeLine(std::string("=== Error: ===\n") + e.what() + "\n=== End Er ===");
         exit(static_cast<int>(e.code()));
     }
 }

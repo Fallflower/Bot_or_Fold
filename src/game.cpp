@@ -40,7 +40,6 @@ void Game<NumT>::reset_tags() {
         atag[i] = false;
     }
     raiseCount = 0;
-    roundHistory.clear();
 }
 
 template<typename NumT>
@@ -75,7 +74,6 @@ void Game<NumT>::checkState() {
     if (n1 > 1 && n2 == 0) {   // 当只剩多个非Allin玩家且非fold玩家，且全部check状态时，进入下一阶段
         stateCode++;
         raiseCount = 0;
-        roundHistory.clear();
         deck_.setShow(stateCode);
         lastBet = -1;   // 清空lasetBet指针
         for (int j = 0; j < playerNum; j++) // 清空check tags
@@ -306,7 +304,7 @@ Game<NumT>::Game(int pn, int d): playerNum(pn), dealer(d), stateCode(0), raiseCo
 
 template<typename NumT>
 Game<NumT>::Game(const Position& p,const int& c, const HumanPlayer<NumT>& hp, const int& hppi)
-: playerNum(p.getPlayerNum()), inic(c), hpi(hppi), dealer(p.getDealer()), stateCode(0), pos(p), raiseCount(0), roundHistory(std::vector<actInfo>()) {
+: playerNum(p.getPlayerNum()), inic(c), hpi(hppi), dealer(p.getDealer()), stateCode(0), pos(p), raiseCount(0) {
     init_game();
     init_players(hp, c);
     init_blinds();
@@ -435,10 +433,6 @@ void Game<NumT>::showPlayerView(std::ostream& out) const {
     out << "================================================================" << std::endl;
     if (active != hpi)  // 非人类玩家行动时，显示思考提示
         out << players[active]->getName() << " is thinking..." << std::endl;
-    else if (roundHistory.size() > 0) { // 人类玩家时，显示上次操作
-        const actInfo aif = roundHistory.back();
-        out << players[aif.id]->getName() << "\t" << aif << std::endl;
-    }
 }
 
 template<typename NumT>
@@ -466,15 +460,11 @@ template<typename NumT>
 void Game<NumT>::call(const int& amount) {
     chips[active][stateCode] += amount;
     ctag[active] = true;
-    if (players[active]->getChips() == 0)
-        atag[active] = true;
     checkState();
 }
 
 template<typename NumT>
 void Game<NumT>::bet(const int& chip) {
-    if (chips[active][stateCode] + chip <= commit[stateCode])
-        throw Error(1, "System Error: Invalid betting scale.");
     for (int i = 0; i < playerNum; i++)
         if (!atag[i])       // 只有非all-in玩家才会被清空check tag
             ctag[i] = false;// 加注将清空其他人的check tag
@@ -482,15 +472,14 @@ void Game<NumT>::bet(const int& chip) {
     chips[active][stateCode] += chip;
     commit[stateCode] = chips[active][stateCode];
     lastBet = active;
-    if (players[active]->getChips() == 0)
-        atag[active] = true;
     raiseCount++;
-    step();
+    checkState();
 }
 
 template<typename NumT>
 void Game<NumT>::toAct() { // 玩家筹码修改在Player的makeAction中处理
-
+    int actidx = active;
+    int sc = stateCode;
     int chipsToCall = getChipsToCall();
     int playerChips = players[active]->getChips();
 
@@ -498,20 +487,17 @@ void Game<NumT>::toAct() { // 玩家筹码修改在Player的makeAction中处理
     int activePlayers = 0;
     for (int i = 0; i < playerNum; i++)
         if (!ftag[i] && !atag[i]) activePlayers++;
-    // bool canRaise = activePlayers >= 1;  // 有对手才能下注/加注
 
-    // 由Game判断合法操作列表
     std::vector<ACTION> legalActions;
-    if (chipsToCall == 0) {
+    if (chipsToCall < 0) {
+        throw Error(5, "System Error: chipsToCall < 0");
+    } else if (chipsToCall == 0) {
         legalActions = {CHECK, RAISE};
-        // if (canRaise) legalActions.push_back(RAISE);
     } else if (chipsToCall < playerChips) {
         legalActions = {FOLD, CALL, RAISE};
-        // if (canRaise) legalActions.push_back(RAISE);
     } else {
-        legalActions = {FOLD, CALL};  // CALL = 全下跟注
+        legalActions = {FOLD, CALL};
     }
-
     gameInfo<NumT> info {
         .playerNum = playerNum,
         .remainPlayerNum = activePlayers,
@@ -526,27 +512,46 @@ void Game<NumT>::toAct() { // 玩家筹码修改在Player的makeAction中处理
         .handType = HandType<NumT>::evaluate(getHands(active)),
         .legalActions = legalActions,
         .raiseCount = raiseCount,
-        .roundHistory = roundHistory
     };
     int betAmount = 0;
     ACTION action = players[active]->makeAction(info, betAmount);
-    players[active]->addActionHistory(actInfo{active, stateCode, action, betAmount});
-    roundHistory.push_back(actInfo{active, stateCode, action, betAmount});
-    if (g_log) {
-        std::string actStr = action2str(action);
-        if (action == RAISE)
-            actStr += " " + std::to_string(betAmount);
-        g_log->writeLine("  [" + std::string(stateStr[stateCode]) + "] " + players[active]->getName() + ": " + actStr);
-    }
+
     switch (action) {
     case FOLD:
         fold(); break;
     case CHECK:
         call(0); break;
     case CALL:
-        call(std::min(chipsToCall, playerChips)); break;
+        if (chipsToCall >= playerChips) {
+            atag[active] = true; // 全下跟注
+            players[active]->setChips(0);
+            call(playerChips);
+        } else {
+            players[active]->decChips(chipsToCall);
+            call(chipsToCall);
+        }
+        break;
     case RAISE:
-        bet(betAmount); break;
+        if (betAmount >= playerChips) {
+            atag[active] = true; // 全下加注
+            players[active]->setChips(0);
+            betAmount = playerChips;
+        } else if (betAmount <= chipsToCall) {
+            throw Error(10, "User Error: Invalid bet amount.");
+        } else {
+            players[active]->decChips(betAmount);
+        }
+        bet(betAmount);
+        break;
+    }
+
+    // 最后记录操作历史，确保记录到准确的信息
+    players[actidx]->addActionHistory(actInfo{actidx, sc, action, betAmount});
+    if (g_log) {
+        std::string actStr = action2str(action);
+        if (action == RAISE)
+            actStr += " " + std::to_string(betAmount);
+        g_log->writeLine("  [" + std::string(stateStr[sc]) + "] " + players[actidx]->getName() + ": " + actStr);
     }
 }
 
