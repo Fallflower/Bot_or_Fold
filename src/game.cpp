@@ -9,16 +9,6 @@
 
 const std::string stateStr[] = {"preflop", "flop", "turn", "river", "end"};
 
-
-template <class ElemType >
-inline void Swap(ElemType &e1, ElemType &e2)
-// 操作结果: 交换e1, e2之值
-{
-	ElemType temp;		// 临时变量
-	// 循环赋值实现交换e1, e2
-	temp = e1;	e1 = e2;  e2 = temp;
-}
-
 template<typename NumT>
 void Game<NumT>::init_game() {
     chips = new int*[playerNum];
@@ -222,6 +212,92 @@ std::vector<int> Game<NumT>::checkWinner(const std::vector<std::vector<Card<NumT
 }
 
 template<typename NumT>
+std::vector<int> Game<NumT>::getWinners(const std::vector<int>& eligiblePlayers) const {
+    int bestRank = INT_MAX;
+    std::vector<int> winners;
+
+    for (int idx : eligiblePlayers) {
+        if (!ftag[idx]) {
+            auto handCards = getFinalHands(idx);
+            int rank = advancedEvaluate(handCards);
+            if (rank < bestRank) {
+                winners.clear();
+                bestRank = rank;
+                winners.push_back(idx);
+            } else if (rank == bestRank) {
+                winners.push_back(idx);
+            }
+        }
+    }
+    return winners;
+}
+
+template<typename NumT>
+std::vector<SidePot> Game<NumT>::calculateSidePots() const {
+    // Copy each player's total committed chips
+    std::vector<int> remaining(playerNum);
+    for (int i = 0; i < playerNum; i++)
+        remaining[i] = getPlayerCommited(i);
+
+    // Collect all-in non-folded players, sorted by total committed ascending
+    std::vector<std::pair<int, int>> allinPlayers;  // (index, total_committed)
+    for (int i = 0; i < playerNum; i++) {
+        if (!ftag[i] && atag[i])
+            allinPlayers.emplace_back(i, getPlayerCommited(i));
+    }
+    std::sort(allinPlayers.begin(), allinPlayers.end(),
+              [](const auto& a, const auto& b) { return a.second < b.second; });
+
+    std::vector<SidePot> pots;
+    int prevLevel = 0;
+
+    for (const auto& [idx, level] : allinPlayers) {
+        if (level <= prevLevel) continue;
+
+        int diff = level - prevLevel;
+        int levelContrib = 0;
+
+        for (int p = 0; p < playerNum; p++) {
+            int take = std::min(remaining[p], diff);
+            remaining[p] -= take;
+            levelContrib += take;
+        }
+
+        // Eligible: non-folded players who committed at least 'level'
+        std::vector<int> eligible;
+        for (int p = 0; p < playerNum; p++) {
+            if (!ftag[p] && getPlayerCommited(p) >= level)
+                eligible.push_back(p);
+        }
+
+        pots.push_back({levelContrib, std::move(eligible)});
+        prevLevel = level;
+    }
+
+    // Final pot: remaining chips from non-all-in players
+    int finalContrib = 0;
+    for (int i = 0; i < playerNum; i++)
+        finalContrib += remaining[i];
+
+    if (finalContrib > 0) {
+        std::vector<int> eligible;
+        for (int p = 0; p < playerNum; p++) {
+            if (!ftag[p] && !atag[p])
+                eligible.push_back(p);
+        }
+        if (eligible.empty()) {  // fallback: all non-folded
+            for (int p = 0; p < playerNum; p++) {
+                if (!ftag[p])
+                    eligible.push_back(p);
+            }
+        }
+        pots.push_back({finalContrib, std::move(eligible)});
+    }
+
+    return pots;
+}
+
+template<typename NumT>
 Game<NumT>::Game(int pn, int d): playerNum(pn), dealer(d), stateCode(0), raiseCount(0) {
     init_game();
     deck_.shuffle();
@@ -267,6 +343,22 @@ void Game<NumT>::show(std::ostream& out) const {
     out << std::endl;
     out << "   State:  " << stateStr[stateCode] << std::endl;
     out << "     Pot:  " << getPot() << std::endl;
+    if (stateCode >= 3 || isEnd()) {
+        auto sidePots = calculateSidePots();
+        if (sidePots.size() > 1) {
+            for (size_t pi = 0; pi < sidePots.size(); pi++) {
+                out << "     ";
+                if (pi == 0) out << "Main";
+                else out << "Side#" << pi;
+                out << ": " << sidePots[pi].amount << " chips [";
+                for (size_t j = 0; j < sidePots[pi].eligiblePlayers.size(); j++) {
+                    if (j > 0) out << ",";
+                    out << sidePots[pi].eligiblePlayers[j];
+                }
+                out << "]" << std::endl;
+            }
+        }
+    }
     out << "----------------------------------------------------------------" << std::endl;
     auto win_rate = calcWinRate(20000);
     for (int i = 0; i < playerNum; i++) {
@@ -297,6 +389,22 @@ void Game<NumT>::showPlayerView(std::ostream& out) const {
     printCards(out, deck_.getPubCards(), "\t    ");
     out << "   State:  " << stateStr[stateCode] << "\n";
     out << "     Pot:  " << getPot() << "\n";
+    if (stateCode >= 3 || isEnd()) {
+        auto sidePots = calculateSidePots();
+        if (sidePots.size() > 1) {
+            for (size_t pi = 0; pi < sidePots.size(); pi++) {
+                out << "     ";
+                if (pi == 0) out << "Main";
+                else out << "Side#" << pi;
+                out << ": " << sidePots[pi].amount << " chips [";
+                for (size_t j = 0; j < sidePots[pi].eligiblePlayers.size(); j++) {
+                    if (j > 0) out << ",";
+                    out << sidePots[pi].eligiblePlayers[j];
+                }
+                out << "]\n";
+            }
+        }
+    }
     out << "----------------------------------------------------------------\n";
 
     for (int i = 0; i < playerNum; i++) {
@@ -445,29 +553,56 @@ void Game<NumT>::toAct() { // 玩家筹码修改在Player的makeAction中处理
 template<typename NumT>
 void Game<NumT>::afterEnd() {
     if (!isEnd()) return;
-    auto winners = checkWinner(hands, deck_.getPubCards());
-    int pot = getPot();
-    int share = pot / winners.size();
-    for (size_t i = 0; i < winners.size(); i++)
-        players[winners[i]]->addChips(share);
 
-    // 终端输出：玩家关心的结果
+    auto sidePots = calculateSidePots();
+
+    // 终端输出
     std::cout << "\nGame Over! Final Results:" << std::endl;
     show();
-    for (size_t i = 0; i < winners.size(); i++)
-        std::cout << players[winners[i]]->getName() << " won " << share << " chips" << std::endl;
+
+    // 按边池分发筹码
+    for (size_t pi = 0; pi < sidePots.size(); pi++) {
+        const auto& sp = sidePots[pi];
+        auto winners = getWinners(sp.eligiblePlayers);
+
+        if (winners.empty()) continue;
+
+        int share = sp.amount / winners.size();
+        int remainder = sp.amount - share * winners.size();
+
+        for (size_t i = 0; i < winners.size(); i++) {
+            int award = share + (i == 0 ? remainder : 0);
+            players[winners[i]]->addChips(award);
+        }
+
+        // 输出每个池的结果
+        std::string potLabel = (pi == 0) ? "Main pot" : ("Side pot " + std::to_string(pi));
+        std::cout << potLabel << " (" << sp.amount << " chips) — ";
+        for (size_t i = 0; i < winners.size(); i++) {
+            if (i > 0) std::cout << ", ";
+            std::cout << players[winners[i]]->getName();
+        }
+        std::cout << " won " << share << " each" << (remainder > 0 ? " (+" + std::to_string(remainder) + " remainder)" : "") << std::endl;
+
+        if (g_log) {
+            std::string logStr = potLabel + " (" + std::to_string(sp.amount) + " chips) — eligible: [";
+            for (size_t i = 0; i < sp.eligiblePlayers.size(); i++) {
+                if (i > 0) logStr += ", ";
+                logStr += players[sp.eligiblePlayers[i]]->getName();
+            }
+            logStr += "] — winners: ";
+            for (size_t i = 0; i < winners.size(); i++) {
+                if (i > 0) logStr += ", ";
+                logStr += players[winners[i]]->getName();
+            }
+            g_log->writeLine(logStr);
+        }
+    }
+
     if (players[hpi]->getChips() == 0) {
         players[hpi]->setChips(inic);
         std::cout << "Unfortunately, you lost all chips. Chips Topped up." << std::endl;
-    }
-
-    // 日志文件：详细上帝视角
-    if (g_log) {
-        g_log->writeLine("\nGame Over! Final Results:");
-        show(g_log->stream());
-        for (size_t i = 0; i < winners.size(); i++)
-            g_log->writeLine(std::string(players[winners[i]]->getName()) + " won " + std::to_string(share) + " chips");
-        if (players[hpi]->getChips() == 0)
+        if (g_log)
             g_log->writeLine("Unfortunately, you lost all chips. Chips Topped up.");
     }
 }
