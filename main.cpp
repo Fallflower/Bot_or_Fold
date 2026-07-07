@@ -5,7 +5,7 @@
 
 template<typename NumT>
 void runGame(Position& pos, int chips, const std::string& name, int hppi) {
-    GameLog log("game_log4.txt");
+    GameLog log("game_log5.txt");
     g_log = &log;
 
     Game<NumT> g(pos, chips, HumanPlayer<NumT>(name, chips), hppi);
@@ -13,6 +13,7 @@ void runGame(Position& pos, int chips, const std::string& name, int hppi) {
     try {
         int flag = 1;
         while (flag) {
+            g.show(log.stream());
             while (!g.isEnd()) {
                 clearScreen();
                 g.showPlayerView();

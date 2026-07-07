@@ -533,9 +533,14 @@ void Game<NumT>::toAct() { // 玩家筹码修改在Player的makeAction中处理
         break;
     case RAISE:
         if (betAmount >= playerChips) {
-            atag[active] = true; // 全下加注
+            atag[active] = true; 
             players[active]->setChips(0);
             betAmount = playerChips;
+            if (playerChips <= chipsToCall) { // 全下跟注
+                action = CALL;
+                call(playerChips);
+                break;
+            }
         } else if (betAmount <= chipsToCall) {
             throw Error(10, "User Error: Invalid bet amount.");
         } else {
@@ -614,11 +619,7 @@ void Game<NumT>::afterEnd() {
 
 template<typename NumT>
 void Game<NumT>::nextRound() {
-    if (g_log) {
-        g_log->writeLine("================================================================");
-        g_log->writeLine("--- New Round ---");
-        g_log->writeLine("================================================================");
-    }
+    if (g_log) g_log->writeLine("--- New Round ---");
     stateCode = 0;
     dealer = (dealer + 1) % playerNum;
     active = (dealer + 3) % playerNum;
