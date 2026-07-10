@@ -45,7 +45,7 @@ void Game<NumT>::reset_tags() {
 template<typename NumT>
 void Game<NumT>::init_players(const HumanPlayer<NumT>& p, const int& c) {
     for (int i = 1; i < playerNum; i++)
-        players.push_back(std::make_unique<BotPlayer<NumT>>("BotPlayer"+std::to_string(i), c));
+        players.push_back(std::make_unique<BotPlayer<NumT>>("BP"+std::to_string(i), c));
     players.insert(players.begin() + hpi, std::make_unique<HumanPlayer<NumT>>(p));
 }
 
@@ -115,7 +115,7 @@ double Game<NumT>::calcEquity(const int& pi, const int& simulations) const {
     int left_n = 5 - knownPubCards.size();
     Deck<NumT> simDeck(getHands(pi));   // 构造一个牌堆，不含玩家pi的手牌和已知的公共牌
     for (int i = 0; i < simulations; i++) {
-        Deck<NumT> tempDeck = simDeck;
+        Deck<NumT> tempDeck = simDeck;  // 复制构造的牌堆
         tempDeck.shuffle();
         std::vector<std::vector<Card<NumT>>> simHands;
         tempDeck.deal(playerNum, simHands);
@@ -130,9 +130,7 @@ double Game<NumT>::calcEquity(const int& pi, const int& simulations) const {
         for (auto j : winners)
             win[j] += share;
     }
-    for (int i = 0; i < playerNum; i++)
-        win[i] = 100.0 * win[i] / simulations;
-    return win[pi];
+    return win[pi] * 100.0 / simulations;
 }
 
 template<typename NumT>
@@ -363,7 +361,7 @@ void Game<NumT>::show(std::ostream& out) const {
         if (i == active) out << " *";
         else out << "  ";
         // 玩家名
-        out << (i==hpi ? "HP"+std::to_string(i) : "BP"+std::to_string(i));
+        out << std::left << std::setw(4) << players[i]->getName();
         out << " (" << pos[i] << ")";
         // 后手筹码
         out << std::right << std::setw(5) << players[i]->getChips() << " BB:\t";
@@ -409,7 +407,7 @@ void Game<NumT>::showPlayerView(std::ostream& out) const {
         // active标记
         out << (i == active ? " *" : "  ");
         //玩家名：固定宽度
-        out << std::left << std::setw(12) << players[i]->getName();
+        out << std::left << std::setw(4) << players[i]->getName();
         out << " (" << pos[i] << ")";
         // 后手筹码
         out << std::right << std::setw(5) << players[i]->getChips() << " :\t";
@@ -433,6 +431,8 @@ void Game<NumT>::showPlayerView(std::ostream& out) const {
     out << "================================================================" << std::endl;
     if (active != hpi)  // 非人类玩家行动时，显示思考提示
         out << players[active]->getName() << " is thinking..." << std::endl;
+    else
+        out << "Your handType is: " << HandType<NumT>::evaluate(getHands(hpi)) << std::endl;
 }
 
 template<typename NumT>
