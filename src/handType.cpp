@@ -76,21 +76,30 @@ HandType<NumT> HandType<NumT>::evaluate(const std::vector<Card<NumT>>& cards) { 
     };
     std::map<NumT, int> num_statistic;
 
-    for (int ci = 0; ci <= static_cast<int>(NumT::ACE); ci++)
-        num_statistic[static_cast<NumT>(ci)] = 0;
+    for (int i = kFirstRank<NumT>; i <= 12; i++)
+        num_statistic[static_cast<NumT>(i)] = 0;
 
     for (Card<NumT> c : cards) {
         suit_statistic[c.getSuit()]++;
         num_statistic[c.getNum()]++;
     }
     bool flush = 0, straight = 0, quadra = 0, tag = 0;
-    NumT quaNum= static_cast<NumT>(0), straiNum= static_cast<NumT>(0), quaKicker= static_cast<NumT>(0);
+    NumT quaNum= static_cast<NumT>(0), quaKicker= static_cast<NumT>(0);
     int pair = 0;
     NumT pairNum[3];// 最多三对（不含三条及以上）
     int trible = 0;
     NumT triNum[2]; // 最多两个三条 (不含)
     std::vector<NumT> highNum;
     std::vector<NumT> flushCards;
+    
+    NumT straiNum= static_cast<NumT>(0), fStraiNum= static_cast<NumT>(0);
+
+    // Ace-low straight check (A2345 for long, A6789 for short)
+    auto low0 = static_cast<NumT>(kFirstRank<NumT>);
+    auto low1 = static_cast<NumT>(kFirstRank<NumT> + 1);
+    auto low2 = static_cast<NumT>(kFirstRank<NumT> + 2);
+    auto low3 = static_cast<NumT>(kFirstRank<NumT> + 3);
+
     // check flush
     for (auto it : suit_statistic)
         if (it.second >= 5) {
@@ -98,79 +107,98 @@ HandType<NumT> HandType<NumT>::evaluate(const std::vector<Card<NumT>>& cards) { 
             for (Card<NumT> c : cards)
                 if (c.getSuit() == it.first)
                     flushCards.push_back(c.getNum());
-            std::sort(flushCards.rbegin(), flushCards.rend());
-            for (size_t i = 0; i <= flushCards.size() - 5; i++) {
-                if (static_cast<int>(flushCards[i]) == static_cast<int>(flushCards[i + 4]) - 4) {
-                    tag = 1;
-                    straiNum = flushCards[i];
-                    break;
+            // prepare for check straight flush
+            std::map<NumT, int> fcns; // flush cards num statistic
+            for (int i = kFirstRank<NumT>; i <= 12; i++)
+                fcns[static_cast<NumT>(i)] = 0;
+            for (Card<NumT> c : flushCards)
+                fcns[c.getNum()]++;
+            // check Ace-low straight flush
+            if (fcns[low0]
+                && fcns[low1]
+                && fcns[low2]
+                && fcns[low3]
+                && fcns[NumT::ACE]) {
+                tag = 1;
+                fStraiNum = low3;
+            }
+            // check normal straight flush
+            int sf_low = kFirstRank<NumT>;
+            int k = 0;
+            for (int i = kFirstRank<NumT>; i <= 12; i++) {
+                if (fcns[static_cast<NumT>(i)] && i == sf_low + 1) {
+                    sf_low = i;
+                    k++;
+                    if (k >= 4) {
+                        tag = 1;
+                        fStraiNum = static_cast<NumT>(sf_low);
+                    }
+                } else if (fcns[static_cast<NumT>(i)] == 0) {
+                    k = 0;
+                    sf_low = i + 1;
                 }
             }
         }
-
-    // Ace-low straight check (A2345 for long, A6789 for short)
-    auto low0 = static_cast<NumT>(kFirstRank<NumT>);
-    auto low1 = static_cast<NumT>(kFirstRank<NumT> + 1);
-    auto low2 = static_cast<NumT>(kFirstRank<NumT> + 2);
-    auto low3 = static_cast<NumT>(kFirstRank<NumT> + 3);
+    // return if straight flush found
+    if (flush && tag) return {STRAIGHT_FLUSH, {fStraiNum}};
+    // else, continue
     if (num_statistic[low0]
         && num_statistic[low1]
         && num_statistic[low2]
         && num_statistic[low3]
-        && num_statistic[static_cast<NumT>(NumT::ACE)]
+        && num_statistic[NumT::ACE]
         && !tag
     ) {
         straight = 1;
         straiNum = low3;
     }
 
-    NumT strai_low = static_cast<NumT>(0);
+    int strai_low = kFirstRank<NumT>;
     int k = 0;
-    for (int ci = 0; ci <= static_cast<int>(NumT::ACE); ci++) {
-        NumT i = static_cast<NumT>(ci);
-        switch (num_statistic[i])
+    for (int i = kFirstRank<NumT>; i <= 12; i++) {
+        NumT ci = static_cast<NumT>(i);
+        switch (num_statistic[ci])
         {
         case 4:
             quadra = 1;
-            quaNum = i;
+            quaNum = ci;
             break;
         case 3:
-            triNum[trible++] = i;
+            triNum[trible++] = ci;
             break;
         case 2:
-            pairNum[pair++] = i;
+            pairNum[pair++] = ci;
             break;
         case 1://  记录kicker
-            highNum.insert(highNum.begin(), i);
+            highNum.insert(highNum.begin(), ci);
             break;
         case 0://   清空顺子记录
             k = 0;
-            strai_low = static_cast<NumT>(ci + 1);
+            strai_low = i + 1;
             break;
         default:
             break;
         }
-        if (num_statistic[i] >= 1 && i == static_cast<NumT>(static_cast<int>(strai_low) + 1)) {//    判断顺子
+        if (num_statistic[ci] >= 1 && i == strai_low + 1) {//    判断顺子
             strai_low = i;
             k++;
-            if (k >= 4 && !tag) {
+            if (k >= 4) {
                 straight = 1;
-                straiNum = strai_low;
+                straiNum = static_cast<NumT>(strai_low);
             }
         }
     }
     if (quadra) {   // 四条牌型，三条和对子的牌都可能是kicker
-        quaKicker = static_cast<NumT>(0);
+        quaKicker = static_cast<NumT>(kFirstRank<NumT>);
         if (highNum.size() > 0) quaKicker = highNum[0];
         if (trible && triNum[trible - 1] > quaKicker) quaKicker = triNum[trible-1];
         if (pair && pairNum[pair-1] > quaKicker) quaKicker = pairNum[pair-1];
     }
     // return result
-    if (flush && straight && tag) return {STRAIGHT_FLUSH, {straiNum}};
     if (quadra) return {FOUR_OF_A_KIND, {quaNum, quaKicker}};
     if (trible >= 2) return {FULL_HOUSE, {triNum[1], triNum[0]}};
     if (trible==1 && pair) return {FULL_HOUSE, {triNum[0], pairNum[pair - 1]}};
-    if (flush) return {FLUSH, flushCards};
+    if (flush) {std::sort(flushCards.rbegin(), flushCards.rend()); return {FLUSH, flushCards}; }
     if (straight) return {STRAIGHT, {straiNum}};
     if (trible == 1) return {THREE_OF_A_KIND, {triNum[0], highNum[0], highNum[1]}};
     if (pair >= 2) return {TWO_PAIR, {pairNum[pair-1], pairNum[pair-2], highNum[0]}};
