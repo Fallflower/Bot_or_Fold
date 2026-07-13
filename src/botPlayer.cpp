@@ -122,7 +122,7 @@ ACTION BotPlayer<NumT>::actPreflop(const gameInfo<NumT>& info, int &betAmount, b
         if (g_log) g_log->writeLine("\t[决策] 翻前-场景B：面对盲注（无人加注），ctc=" + std::to_string(ctc) + " tier=" + std::to_string(tier) + " 多人底池=" + (mw ? "是" : "否"));
         if (tier >= TIER_PREMIUM) {
             if (g_log) g_log->writeLine("\t\t[决策] → 顶级牌（PREMIUM），" + std::string(lp ? "4倍" : "3倍") + "加注");
-            betAmount = ctc * (3 + lp ? 1 : 0) + 2;
+            betAmount = ctc * (3 + (lp ? 1 : 0)) + 2;
             return RAISE;
         }
         if (tier >= TIER_STRONG) {
@@ -173,7 +173,7 @@ ACTION BotPlayer<NumT>::actPreflop(const gameInfo<NumT>& info, int &betAmount, b
                 }
             }
             if (sb) {
-                int callPct = mw ? 15 : 25;
+                int callPct = mw ? 15 : 55;
                 if (pct() < callPct) {
                     if (g_log) g_log->writeLine("\t\t[决策] → 边缘牌+小盲+" + std::to_string(callPct) + "%概率，补齐");
                     return CALL;
@@ -186,39 +186,53 @@ ACTION BotPlayer<NumT>::actPreflop(const gameInfo<NumT>& info, int &betAmount, b
 
     // ---- Scenario C: facing ONE raise (raiseCount == 1) ----
     if (info.raiseCount == 1) {
-        int potOdds = (info.pot + ctc > 0) ? 100 * ctc / (info.pot + ctc) : 0;
-        if (g_log) g_log->writeLine("\t[决策] 翻前-场景C：面对一次加注，potOdds=" + std::to_string(potOdds) + "% tier=" + std::to_string(tier) + " 多人底池=" + (mw ? "是" : "否"));
+        if (g_log) g_log->writeLine("\t[决策] 翻前-场景C：面对一次加注，tier=" + std::to_string(tier) + " 多人底池=" + (mw ? "是" : "否"));
 
         if (tier >= TIER_PREMIUM) {
             if (g_log) g_log->writeLine("\t\t[决策] → 顶级牌，3倍反加");
-            betAmount = ctc * 3;
+            betAmount = ctc * 3 + 2;
             return RAISE;
         }
         if (tier >= TIER_STRONG) {
-            int oddsLimit = mw ? 25 : 40;
-            if (potOdds < oddsLimit) {
-                if (g_log) g_log->writeLine("\t\t[决策] → 强牌且底池赔率合适（<" + std::to_string(oddsLimit) + "%），平跟");
-                return CALL;
+            int raiseFreq = mw ? 15 : 40;
+            if (pct() < raiseFreq) {
+                if (g_log) g_log->writeLine("\t\t[决策] → 强牌, " + std::to_string(raiseFreq) + "%频率加注");
+                betAmount = ctc * 3 + 2;
+                return RAISE;
             }
+            return CALL;
         }
         if (tier >= TIER_PLAYABLE) {
-            int oddsLimit = mw ? 20 : 30;
-            if (potOdds < oddsLimit && (lp || bb)) {
-                if (g_log) g_log->writeLine("\t\t[决策] → 可玩牌+好赔率+位置佳，平跟");
+            int callFreq = mw ? 30 : 70;
+            if (pct() < callFreq) {
+                if (g_log) g_log->writeLine("\t\t[决策] → 可玩牌" + std::to_string(callFreq) + "%频率平跟");
                 return CALL;
             }
         }
-        if (g_log) g_log->writeLine("\t\t[决策] → 牌力/赔率不足，弃牌");
+        if (g_log) g_log->writeLine("\t\t[决策] → 牌力不足，弃牌");
         return FOLD;
     }
 
     // ---- Scenario D: facing 3-bet or more (raiseCount >= 2) ----
-    if (g_log) g_log->writeLine("\t[决策] 翻前-场景D：面对3-bet及以上，tier=" + std::to_string(tier));
-    if (tier >= TIER_PREMIUM && pct() < 50) {
-        if (g_log) g_log->writeLine("\t\t[决策] → 顶级牌+50%概率，平跟慢打");
+    if (g_log) g_log->writeLine("\t[决策] 翻前-场景D：面对3-bet及以上，tier=" + std::to_string(tier) + " 多人底池=" + (mw ? "是" : "否"));
+    if (tier >= TIER_PREMIUM) {
+        int raiseFreq = mw ? 80 : 50;
+        if (pct() < raiseFreq) {
+            if (g_log) g_log->writeLine("\t\t[决策] → 顶级牌+" + std::to_string(raiseFreq) + "%频率，3倍反加");
+            betAmount = info.chipsToCall * 3 + 2;
+            return RAISE;
+        }
+        if (g_log) g_log->writeLine("\t\t[决策] → 顶级牌，平跟");
         return CALL;
     }
-    if (g_log) g_log->writeLine("\t\t[决策] → 牌力不足/运气不佳，弃牌");
+    if (tier >= TIER_STRONG) {
+        int callFreq = mw ? 20 : 60;
+        if (pct() < callFreq) {
+            if (g_log) g_log->writeLine("\t\t[决策] → 强牌+" + std::to_string(callFreq) + "%频率，平跟买牌");
+            return CALL;
+        }
+    }
+    if (g_log) g_log->writeLine("\t\t[决策] → 牌力不足/考虑频率因素，最终弃牌");
     return FOLD;
 }
 
