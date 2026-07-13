@@ -11,10 +11,10 @@ ACTION HumanPlayer<NumT>::makeAction(const gameInfo<NumT>& info, int &betAmount)
         switch (act) {
         case FOLD:
             std::cout << "=== Fold           [" << i << "] ===" << std::endl; break;
-        case CHECK:
-            std::cout << "=== Check          [" << i << "] ===" << std::endl; break;
         case CALL:
-            std::cout << "=== Call  " << std::right << std::setw(6) << info.chipsToCall << "   [" << i << "] ===" << std::endl; break;
+            if (info.chipsToCall > 0) std::cout << "=== Call  " << std::right << std::setw(6) << info.chipsToCall << "   [" << i << "] ===" << std::endl;
+            else std::cout << "=== Check          [" << i << "] ===" << std::endl;
+            break;
         case RAISE:
             std::cout << "=== Raise          [" << i << "] ===" << std::endl; break;
         }
@@ -36,8 +36,6 @@ ACTION HumanPlayer<NumT>::makeAction(const gameInfo<NumT>& info, int &betAmount)
     switch (info.legalActions[idx]) {
     case FOLD:
         return FOLD;
-    case CHECK:
-        return CHECK;
     case CALL:
         return CALL;
     case RAISE: {

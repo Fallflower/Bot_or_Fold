@@ -424,7 +424,7 @@ void Game<NumT>::showPlayerView(std::ostream& out) const {
         else if (ftag[i])
             out << std::left << std::setw(14) << "(fold)  .";
         else
-            out << std::left << std::setw(14) << ".";
+            out << std::left << std::setw(14) << "......  .";
         out << "\n";
     }
 
@@ -492,7 +492,7 @@ void Game<NumT>::toAct() { // 玩家筹码修改在Player的makeAction中处理
     if (chipsToCall < 0) {
         throw Error(5, "System Error: chipsToCall < 0");
     } else if (chipsToCall == 0) {
-        legalActions = {CHECK, RAISE};
+        legalActions = {CALL, RAISE};
     } else if (chipsToCall < playerChips) {
         legalActions = {FOLD, CALL, RAISE};
     } else {
@@ -517,17 +517,19 @@ void Game<NumT>::toAct() { // 玩家筹码修改在Player的makeAction中处理
     ACTION action = players[active]->makeAction(info, betAmount);
 
     switch (action) {
+    default:
+        throw Error(6, "System Error: Invalid action.");
     case FOLD:
         fold(); break;
-    case CHECK:
-        call(0); break;
     case CALL:
         if (chipsToCall >= playerChips) {
             atag[active] = true; // 全下跟注
             players[active]->setChips(0);
+            betAmount = playerChips;
             call(playerChips);
         } else {
             players[active]->decChips(chipsToCall);
+            betAmount = chipsToCall;
             call(chipsToCall);
         }
         break;
@@ -626,7 +628,7 @@ void Game<NumT>::nextRound() {
     reset_tags();
     pos.step();
     for (int i = 0; i < playerNum; i++) {
-        players[i]->addActionHistory(actInfo{-1, -1, CHECK, 0});
+        players[i]->addActionHistory(actInfo());
         if (i != hpi && players[i]->getChips() < inic) players[i]->setChips(inic); // 每轮给人机补筹码
     }
     init_blinds();

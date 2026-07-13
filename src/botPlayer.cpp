@@ -59,9 +59,12 @@ HandTier BotPlayer<NumT>::getTier(int score) const {
     return TIER_TRASH;
 }
 
-// ============================================================
-//                   Entry point
-// ============================================================
+/* ============================================================
+ *                   Entry point
+ * ============================================================
+ * Fold/Call操作不用动betAmount
+ * Raise操作需要设置betAmount为加注金额
+*/
 template<typename NumT>
 ACTION BotPlayer<NumT>::makeAction(const gameInfo<NumT>& info, int &betAmount) {
     if (g_log) g_log->write(this->getName());
@@ -100,22 +103,26 @@ ACTION BotPlayer<NumT>::actPreflop(const gameInfo<NumT>& info, int &betAmount, b
     // ---- Scenario A: can check for free (BB with no raise) ----
     if (ctc == 0) {
         if (g_log) g_log->writeLine("\t[决策] 翻前-场景A：可免费过牌，当前tier=" + std::to_string(tier));
-        if (tier >= TIER_STRONG) {
-            if (g_log) g_log->writeLine("\t\t[决策] → 手牌强（tier≥STRONG），加注逼价值");
+        if (tier >= TIER_PREMIUM) {
+            if (g_log) g_log->writeLine("\t\t[决策] → 手牌顶级（tier≥PREMIUM），加注隔离");
+            betAmount = info.pot + 4;
+            return RAISE;
+        }
+        if (tier >= TIER_STRONG && pct() < 30) {
+            if (g_log) g_log->writeLine("\t\t[决策] → 手牌强（tier≥STRONG），30%频率加注隔离");
             betAmount = info.pot + 4;
             return RAISE;
         }
         if (g_log) g_log->writeLine("\t\t[决策] → 手牌弱，过牌");
-        return CHECK;
+        return CALL;
     }
 
     // ---- Scenario B: facing blinds (raiseCount == 0, ctc > 0) ----
     if (info.raiseCount == 0) {
         if (g_log) g_log->writeLine("\t[决策] 翻前-场景B：面对盲注（无人加注），ctc=" + std::to_string(ctc) + " tier=" + std::to_string(tier) + " 多人底池=" + (mw ? "是" : "否"));
         if (tier >= TIER_PREMIUM) {
-            if (g_log) g_log->writeLine("\t\t[决策] → 顶级牌（PREMIUM），4倍加注" + std::string(lp ? "（有利位置追加2）" : ""));
-            betAmount = ctc * 4 + (lp ? 2 : 0);
-
+            if (g_log) g_log->writeLine("\t\t[决策] → 顶级牌（PREMIUM），" + std::string(lp ? "4倍" : "3倍") + "加注");
+            betAmount = ctc * (3 + lp ? 1 : 0) + 2;
             return RAISE;
         }
         if (tier >= TIER_STRONG) {
@@ -123,6 +130,12 @@ ACTION BotPlayer<NumT>::actPreflop(const gameInfo<NumT>& info, int &betAmount, b
                 if (g_log) g_log->writeLine("\t\t[决策] → 强牌+有利位置，3倍加注+2");
                 betAmount = ctc * 3 + 2;
                 return RAISE;
+            } else {
+                if (pct() < 30) {
+                    if (g_log) g_log->writeLine("\t\t[决策] → 强牌+不利位置，30%频率加注");
+                    betAmount = ctc * 3 + 2;
+                    return RAISE;
+                }
             }
             if (g_log) g_log->writeLine("\t\t[决策] → 强牌+不利位置，平跟");
             return CALL;
@@ -130,10 +143,10 @@ ACTION BotPlayer<NumT>::actPreflop(const gameInfo<NumT>& info, int &betAmount, b
         if (tier >= TIER_PLAYABLE) {
             if (bb) {
                 if (g_log) g_log->writeLine("\t\t[决策] → 可玩牌+大盲，过牌");
-                return CHECK;
+                return CALL;
             }
             if (sb) {
-                if (mw && pct() >= 85) {
+                if (mw && pct() < 85) {
                     if (g_log) g_log->writeLine("\t\t[决策] → 可玩牌+小盲+多人池+85%弃牌");
                     return FOLD;
                 }
@@ -156,7 +169,7 @@ ACTION BotPlayer<NumT>::actPreflop(const gameInfo<NumT>& info, int &betAmount, b
                 int defPct = mw ? 30 : 45;
                 if (pct() < defPct) {
                     if (g_log) g_log->writeLine("\t\t[决策] → 边缘牌+大盲+" + std::to_string(defPct) + "%概率，过牌");
-                    return CHECK;
+                    return CALL;
                 }
             }
             if (sb) {
@@ -233,7 +246,7 @@ ACTION BotPlayer<NumT>::actFlop(const gameInfo<NumT>& info, int &betAmount, bool
                 return RAISE;
             }
             if (g_log) g_log->writeLine("\t\t[决策] → 过牌");
-            return CHECK;
+            return CALL;
         } else {
             if (wr > 55) {
                 if (g_log) g_log->writeLine("\t\t[决策] → wr>55%，价值下注60%");
@@ -247,7 +260,7 @@ ACTION BotPlayer<NumT>::actFlop(const gameInfo<NumT>& info, int &betAmount, bool
                     return RAISE;
                 }
                 if (g_log) g_log->writeLine("\t\t[决策] → wr>40%+概率不足，过牌");
-                return CHECK;
+                return CALL;
             }
             if (wr > 25 && pct() < 12) {
                 if (g_log) g_log->writeLine("\t\t[决策] → wr>25%+12%半诈唬50%");
@@ -260,7 +273,7 @@ ACTION BotPlayer<NumT>::actFlop(const gameInfo<NumT>& info, int &betAmount, bool
                 return RAISE;
             }
             if (g_log) g_log->writeLine("\t\t[决策] → 过牌");
-            return CHECK;
+            return CALL;
         }
     }
 
@@ -347,7 +360,7 @@ ACTION BotPlayer<NumT>::actTurn(const gameInfo<NumT>& info, int &betAmount, bool
                 return RAISE;
             }
             if (g_log) g_log->writeLine("\t\t[决策] → 过牌");
-            return CHECK;
+            return CALL;
         } else {
             if (wr > 60) {
                 if (g_log) g_log->writeLine("\t\t[决策] → wr>60%，价值下注65%");
@@ -360,7 +373,7 @@ ACTION BotPlayer<NumT>::actTurn(const gameInfo<NumT>& info, int &betAmount, bool
                     betAmount = std::max((int)(pot * 0.5), 6);
                     return RAISE;
                 }
-                return CHECK;
+                return CALL;
             }
             if (pct() < 8) {
                 if (g_log) g_log->writeLine("\t\t[决策] → 8%诈唬55%");
@@ -373,7 +386,7 @@ ACTION BotPlayer<NumT>::actTurn(const gameInfo<NumT>& info, int &betAmount, bool
                 return RAISE;
             }
             if (g_log) g_log->writeLine("\t\t[决策] → 过牌");
-            return CHECK;
+            return CALL;
         }
     }
 
@@ -463,7 +476,7 @@ ACTION BotPlayer<NumT>::actRiver(const gameInfo<NumT>& info, int &betAmount, boo
                 return RAISE;
             }
             if (g_log) g_log->writeLine("\t\t[决策] → 过牌");
-            return CHECK;
+            return CALL;
         } else {
             if (wr > 65) {
                 if (g_log) g_log->writeLine("\t\t[决策] → wr>65%，价值下注70%");
@@ -476,7 +489,7 @@ ACTION BotPlayer<NumT>::actRiver(const gameInfo<NumT>& info, int &betAmount, boo
                     betAmount = std::max((int)(pot * 0.55), 6);
                     return RAISE;
                 }
-                return CHECK;
+                return CALL;
             }
             if (pct() < 5) {
                 if (g_log) g_log->writeLine("\t\t[决策] → 5%纯诈唬40%");
@@ -484,7 +497,7 @@ ACTION BotPlayer<NumT>::actRiver(const gameInfo<NumT>& info, int &betAmount, boo
                 return RAISE;
             }
             if (g_log) g_log->writeLine("\t\t[决策] → 过牌");
-            return CHECK;
+            return CALL;
         }
     }
 

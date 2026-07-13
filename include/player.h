@@ -7,13 +7,12 @@
 
 enum ACTION {
 	FOLD,
-	CHECK,
 	CALL,
 	RAISE
 };
 
 inline std::string action2str(const ACTION& action) {
-    static const std::string actionStr[] = {"Fold", "Check", "Call", "Raise"};
+    static const std::string actionStr[] = {"Fold", "Call", "Raise"};
     return actionStr[action];
 }
 
@@ -23,6 +22,8 @@ struct actInfo {
 	ACTION act;
 	int betAmount;
 
+	actInfo() : id(-1), stateCode(-1), act(CALL), betAmount(0) {}
+	actInfo(int id, int stateCode, ACTION act, int betAmount) : id(id), stateCode(stateCode), act(act), betAmount(betAmount) {}
 	std::ostream &output(std::ostream &out) const;
 };
 
@@ -70,7 +71,7 @@ public:
 	int getChips() const { return chips; }
 	actInfo getLastAction() const {
 		if (actionHistory.size() > 0) return actionHistory.back();
-		return actInfo{-1, -1, CHECK, 0};
+		return actInfo();
 	}
 	std::string getName() const { return name; }
 };
