@@ -22,8 +22,10 @@ private:
     int calcPreflopScore(const gameInfo<NumT>& info) const;
     HandTier getTier(int score) const;
 
-    ACTION actPreflop(const gameInfo<NumT>& info, int &betAmount);
-    ACTION actPostflop(const gameInfo<NumT>& info, int &betAmount);
+    ACTION actPreflop(const gameInfo<NumT>& info, int &betAmount, bool mw);
+    ACTION actFlop(const gameInfo<NumT>& info, int &betAmount, bool mw);
+    ACTION actTurn(const gameInfo<NumT>& info, int &betAmount, bool mw);
+    ACTION actRiver(const gameInfo<NumT>& info, int &betAmount, bool mw);
 };
 
 #endif

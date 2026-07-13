@@ -5,7 +5,7 @@
 
 template<typename NumT>
 void runGame(Position& pos, int chips, const std::string& name, int hppi) {
-    GameLog log("game_log5.txt");
+    GameLog log("game_log.txt");
     g_log = &log;
 
     Game<NumT> g(pos, chips, HumanPlayer<NumT>(name, chips), hppi);
