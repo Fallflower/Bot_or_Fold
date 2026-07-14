@@ -63,13 +63,14 @@ void Game<NumT>::init_blinds() {
 
 template<typename NumT>
 void Game<NumT>::checkState() {
-    int i, n1 = 0, n2 = 0;
+    int i, n1 = 0, n2 = 0, n0 = 0;
     for (i = 0; i < playerNum; i++)
     {
+        if (!ftag[i]) n0++;
         if (!ftag[i] && !atag[i]) n1++;    // 还在牌局中的玩家数
         if (!ftag[i] && !atag[i] && !ctag[i]) n2++;  // 还在牌局中且没有check的玩家数
     }
-    if (n1 < 1) { stateCode = 4; deck_.setShow(stateCode); return; }   // 当没有玩家时，游戏结束
+    if (n1 < 1 || n0 <= 1) { stateCode = 4; deck_.setShow(stateCode); return; }   // 当没有玩家时，游戏结束
     if (n1 == 1 && n2 == 0) { stateCode = 4; deck_.setShow(stateCode); return; }   // 当只剩下一个非Allin玩家且非fold玩家，且check状态时，游戏结束
     if (n1 > 1 && n2 == 0) {   // 当只剩多个非Allin玩家且非fold玩家，且全部check状态时，进入下一阶段
         stateCode++;

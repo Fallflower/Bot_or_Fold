@@ -474,24 +474,33 @@ ACTION BotPlayer<NumT>::actRiver(const gameInfo<NumT>& info, int &betAmount, boo
 
     if (ctc == 0) {
         if (mw) {
-            if (wr > 80) {
-                if (g_log) g_log->writeLine("\t\t[决策] → wr>80% 多人池，价值下注70%");
+            if (wr > 96) {
+                if (g_log) g_log->writeLine("\t\t[决策] → wr>96% 多人池，价值下注70%");
                 betAmount = std::max((int)(pot * 0.7), 6);
                 return RAISE;
             }
-            if (wr > 60 && pct() < 15) {
-                if (g_log) g_log->writeLine("\t\t[决策] → wr>60%+15%薄价值下注50%");
-                betAmount = std::max((int)(pot * 0.5), 6);
-                return RAISE;
+            if (wr > 80) {
+                if (pct() < 30) {
+                    if (g_log) g_log->writeLine("\t\t[决策] → wr>80%+30%频率，价值下注60%");
+                    betAmount = std::max((int)(pot * 0.6), 6);
+                    return RAISE;
+                }
+                if (g_log) g_log->writeLine("\t\t[决策] → wr>80%，多人chip池，求摊牌");
+                return CALL;
             }
             if (pct() < 2) {
-                if (g_log) g_log->writeLine("\t\t[决策] → 2%纯诈唬30%");
-                betAmount = std::max((int)(pot * 0.3), 6);
+                if (g_log) g_log->writeLine("\t\t[决策] → 2%纯诈唬");
+                betAmount = std::max((int)(pot * 0.5), 6);
                 return RAISE;
             }
             if (g_log) g_log->writeLine("\t\t[决策] → 过牌");
             return CALL;
         } else {
+            if (wr > 90) {
+                if (g_log) g_log->writeLine("\t\t[决策] → wr>90%，价值下注75%");
+                betAmount = std::max((int)(pot * 0.75), 6);
+                return RAISE;
+            }
             if (wr > 65) {
                 if (g_log) g_log->writeLine("\t\t[决策] → wr>65%，价值下注70%");
                 betAmount = std::max((int)(pot * 0.7), 6);
@@ -503,11 +512,12 @@ ACTION BotPlayer<NumT>::actRiver(const gameInfo<NumT>& info, int &betAmount, boo
                     betAmount = std::max((int)(pot * 0.55), 6);
                     return RAISE;
                 }
+                if (g_log) g_log->writeLine("\t\t[决策] → wr>50%，双人chip池，求摊牌");
                 return CALL;
             }
             if (pct() < 5) {
-                if (g_log) g_log->writeLine("\t\t[决策] → 5%纯诈唬40%");
-                betAmount = std::max((int)(pot * 0.4), 6);
+                if (g_log) g_log->writeLine("\t\t[决策] → 5%纯诈唬");
+                betAmount = std::max((int)(pot * 0.5), 6);
                 return RAISE;
             }
             if (g_log) g_log->writeLine("\t\t[决策] → 过牌");
@@ -517,54 +527,60 @@ ACTION BotPlayer<NumT>::actRiver(const gameInfo<NumT>& info, int &betAmount, boo
 
     // ---- Facing a bet on River ----
     int potOdds = (pot + ctc > 0) ? 100 * ctc / (pot + ctc) : 0;
-    if (g_log) g_log->writeLine("\t[决策] 河牌-面对下注: potOdds=" + std::to_string(potOdds) + "%");
+    if (g_log) g_log->writeLine("\t[决策] 河牌-面对下注: potOdds=" + std::to_string(potOdds) + "%" + "多人底池=" + (mw ? "是" : "否"));
 
     if (mw) {
+        if (wr > 97) {
+            if (g_log) g_log->writeLine("\t\t[决策] → wr>97%，价值反加注");
+            betAmount = ctc * 2 + (int)(pot * 0.3);
+            return RAISE;
+        }
         if (wr > 80) {
-            if (pct() < 30) {
-                if (g_log) g_log->writeLine("\t\t[决策] → wr>80%+30%概率，价值加注");
-                betAmount = ctc * 3 + (int)(pot * 0.5);
+            if (pct() < 15) {
+                if (g_log) g_log->writeLine("\t\t[决策] → wr>80%+15%概率，加注隔离");
+                betAmount = ctc * 2 + (int)(pot * 0.3);
                 return RAISE;
             }
+            if (g_log) g_log->writeLine("\t\t[决策] → wr>80%，求摊牌");
             return CALL;
         }
-        if (wr > potOdds + 8) {
-            if (g_log) g_log->writeLine("\t\t[决策] → 赔率足够好（+8%），平跟");
+        if (wr > potOdds + 20 && pct() < 45) {
+            if (g_log) g_log->writeLine("\t\t[决策] → 赔率足够好（+20%），45%频率平跟");
             return CALL;
         }
-        if (wr > potOdds + 2 && pct() < 10) {
-            if (g_log) g_log->writeLine("\t\t[决策] → 接近赔率+10%概率，诈唬加注(增加raise频率)");
-            betAmount = ctc * 3;
+        if (pct() < 3) {
+            if (g_log) g_log->writeLine("\t\t[决策] → 3%频率纯诈唬");
+            betAmount = ctc * 2 + (int)(pot * 0.3);
             return RAISE;
         }
-        if (pct() < 1) {
-            if (g_log) g_log->writeLine("\t\t[决策] → 1%纯诈唬");
-            betAmount = ctc * 3;
-            return RAISE;
-        }
-        if (g_log) g_log->writeLine("\t\t[决策] → 多人池河牌无利可图，弃牌");
+        if (g_log) g_log->writeLine("\t\t[决策] → 河牌无利可图，弃牌");
         return FOLD;
     } else {
-        if (wr > 60) {
-            if (pct() < 60) {
-                if (g_log) g_log->writeLine("\t\t[决策] → wr>60%+60%概率，反加");
-                betAmount = ctc * 3 + (int)(pot * 0.5);
-                return RAISE;
-            }
-            return CALL;
-        }
-        if (wr > potOdds) {
-            if (g_log) g_log->writeLine("\t\t[决策] → 正期望赔率，平跟");
-            return CALL;
-        }
-        if (wr > potOdds - 5 && pct() < 6) {
-            if (g_log) g_log->writeLine("\t\t[决策] → 略低赔率+6%诈唬加注");
-            betAmount = ctc * 3;
+        if (wr > 90) {
+            if (g_log) g_log->writeLine("\t\t[决策] → wr>90%，价值反加注");
+            betAmount = ctc * 2 + (int)(pot * 0.3);
             return RAISE;
         }
-        if (pct() < 4) {
-            if (g_log) g_log->writeLine("\t\t[决策] → 4%纯诈唬");
-            betAmount = ctc * 3;
+        if (wr > 75) {
+            if (pct() < 50) {
+                if (g_log) g_log->writeLine("\t\t[决策] → wr>75%+50%概率，反加");
+                betAmount = ctc * 2 + (int)(pot * 0.3);
+                return RAISE;
+            }
+            if (g_log) g_log->writeLine("\t\t[决策] → wr>75%，摊牌");
+            return CALL;
+        }
+        if (wr > potOdds + 8 && pct() < 60) {
+            if (g_log) g_log->writeLine("\t\t[决策] → 正期望赔率+8%，60%频率平跟");
+            return CALL;
+        }
+        if (wr > potOdds && pct() < 20) {
+            if (g_log) g_log->writeLine("\t\t[决策] → 正期望赔率，20%频率平跟");
+            return CALL;
+        }
+        if (pct() < 15) {
+            if (g_log) g_log->writeLine("\t\t[决策] → 15%频率纯诈唬");
+            betAmount = ctc * 2 + (int)(pot * 0.3);
             return RAISE;
         }
         if (g_log) g_log->writeLine("\t\t[决策] → 河牌无利可图，弃牌");
