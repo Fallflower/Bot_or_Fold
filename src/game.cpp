@@ -114,12 +114,12 @@ double Game<NumT>::calcEquity(const int& pi, const int& simulations) const {
 
     std::vector<Card<NumT>> knownPubCards = getKnownPubCards();
     int left_n = 5 - knownPubCards.size();
-    Deck<NumT> simDeck(getHands(pi));   // 构造一个牌堆，不含玩家pi的手牌和已知的公共牌
+    Deck<NumT> simDeck(getHands(pi));   // 构造一个模拟牌堆，不含玩家pi的手牌和已知的公共牌
     for (int i = 0; i < simulations; i++) {
         Deck<NumT> tempDeck = simDeck;  // 复制构造的牌堆
         tempDeck.shuffle();
         std::vector<std::vector<Card<NumT>>> simHands;
-        tempDeck.deal(playerNum, simHands);
+        tempDeck.deal(playerNum - 1, simHands); // 发牌给除玩家pi之外的其他玩家(pn-1人)
         std::vector<Card<NumT>> pub_cards(knownPubCards.begin(), knownPubCards.end());
         if (left_n > 0) {   // 拼接已知的公共牌和随机发的公共牌
             const auto remain_pub = tempDeck.getFrontN(left_n);
@@ -188,10 +188,11 @@ std::vector<double> Game<NumT>::calcWinRate(const int& simulations) const {
 
 template<typename NumT>
 std::vector<int> Game<NumT>::checkWinner(const std::vector<std::vector<Card<NumT>>>& simHands, const std::vector<Card<NumT>>& publicCards) const {
+    if (static_cast<int>(simHands.size()) != playerNum) throw Error(3, "System Error: simHands size mismatch");
     std::vector<int> res;
-    int bestRank = INT_MAX;
+    int bestRank = INT_MAX;     // rank越小牌型越大
     for (int i = 0; i < playerNum; i++) {
-        if (!ftag[i]) {
+        if (!ftag[i]) {         // 排除fold玩家
             std::vector<Card<NumT>> handCards = simHands[i];
             handCards.insert(handCards.end(), publicCards.begin(), publicCards.end());
             int rank = advancedEvaluate(handCards);
