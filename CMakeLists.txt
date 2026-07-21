@@ -6,8 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(SOURCES
-    main.cpp
+set(HOLDEM_CORE_SOURCES
     src/card.cpp
     src/handType.cpp
     src/handType_.cpp
@@ -20,13 +19,15 @@ set(SOURCES
     src/position.cpp
 )
 
-add_executable(main ${SOURCES})
+add_library(holdem_core STATIC ${HOLDEM_CORE_SOURCES})
+add_executable(main main.cpp)
+target_link_libraries(main PRIVATE holdem_core)
 
 # ============================================================================
 # Include directories
 # ============================================================================
 
-target_include_directories(main PRIVATE
+target_include_directories(holdem_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
@@ -34,9 +35,16 @@ target_include_directories(main PRIVATE
 # Compiler flags
 # ============================================================================
 
-target_compile_options(main PRIVATE
+target_compile_options(holdem_core PRIVATE
     -Wall -Wextra
 )
+
+include(CTest)
+if(BUILD_TESTING)
+    add_executable(game_api_test tests/game_api_test.cpp)
+    target_link_libraries(game_api_test PRIVATE holdem_core)
+    add_test(NAME game_api COMMAND game_api_test)
+endif()
 
 # ============================================================================
 # Convenience targets

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <thread>
 #include <random>
+#include <sstream>
 #include <type_traits>
 #include "ranker_data.h"
 #include "ranker_data_short.h"
@@ -447,6 +448,60 @@ int Game<NumT>::getPot() const {
 }
 
 template<typename NumT>
+DecisionRequest Game<NumT>::decisionRequest() const {
+    DecisionRequest request;
+    if (isEnd()) return request;
+
+    request.playerIndex = active;
+    request.human = active == hpi;
+    request.chipsToCall = getChipsToCall();
+    request.maxRaise = players[active]->getChips();
+
+    if (request.chipsToCall < 0) {
+        throw Error(5, "System Error: chipsToCall < 0");
+    }
+    if (request.chipsToCall == 0) {
+        request.legalActions = {CALL, RAISE};
+    } else if (request.chipsToCall < request.maxRaise) {
+        request.legalActions = {FOLD, CALL, RAISE};
+    } else {
+        request.legalActions = {FOLD, CALL};
+    }
+
+    if (std::find(request.legalActions.begin(), request.legalActions.end(), RAISE)
+            != request.legalActions.end()) {
+        request.minRaise = request.chipsToCall + 1;
+    }
+    return request;
+}
+
+template<typename NumT>
+gameInfo<NumT> Game<NumT>::currentDecision() const {
+    if (isEnd()) throw Error(7, "System Error: round has ended");
+
+    const DecisionRequest request = decisionRequest();
+    int activePlayers = 0;
+    for (int i = 0; i < playerNum; i++)
+        if (!ftag[i] && !atag[i]) activePlayers++;
+
+    return gameInfo<NumT> {
+        .playerNum = playerNum,
+        .remainPlayerNum = activePlayers,
+        .stateCode = stateCode,
+        .pot = getPot(),
+        .chipsToCall = request.chipsToCall,
+        .playerCommited = getPlayerCommited(active),
+        .winRate = calcEquity(active, 12288),
+        .positionStr = pos[active],
+        .handCards = hands[active],
+        .publicCards = getKnownPubCards(),
+        .handType = HandType<NumT>::evaluate(getHands(active)),
+        .legalActions = request.legalActions,
+        .raiseCount = raiseCount,
+    };
+}
+
+template<typename NumT>
 void Game<NumT>::fold() {
     ftag[active] = 1;
     // if (hpi == active) {    // 唯一的人类玩家选择弃牌，游戏结束
@@ -479,44 +534,13 @@ void Game<NumT>::bet(const int& chip) {
 }
 
 template<typename NumT>
-void Game<NumT>::toAct() { // 玩家筹码修改在Player的makeAction中处理
+void Game<NumT>::applyAction(const ActionCommand& command) {
     int actidx = active;
     int sc = stateCode;
     int chipsToCall = getChipsToCall();
     int playerChips = players[active]->getChips();
-
-    // 计算还有几个非fold非allin的活跃玩家
-    int activePlayers = 0;
-    for (int i = 0; i < playerNum; i++)
-        if (!ftag[i] && !atag[i]) activePlayers++;
-
-    std::vector<ACTION> legalActions;
-    if (chipsToCall < 0) {
-        throw Error(5, "System Error: chipsToCall < 0");
-    } else if (chipsToCall == 0) {
-        legalActions = {CALL, RAISE};
-    } else if (chipsToCall < playerChips) {
-        legalActions = {FOLD, CALL, RAISE};
-    } else {
-        legalActions = {FOLD, CALL};
-    }
-    gameInfo<NumT> info {
-        .playerNum = playerNum,
-        .remainPlayerNum = activePlayers,
-        .stateCode = stateCode,
-        .pot = getPot(),
-        .chipsToCall = chipsToCall,
-        .playerCommited = getPlayerCommited(active),
-        .winRate = calcEquity(active, 12288),
-        .positionStr = pos[active],
-        .handCards = hands[active],
-        .publicCards = getKnownPubCards(),
-        .handType = HandType<NumT>::evaluate(getHands(active)),
-        .legalActions = legalActions,
-        .raiseCount = raiseCount,
-    };
-    int betAmount = 0;
-    ACTION action = players[active]->makeAction(info, betAmount);
+    ACTION action = command.action;
+    int betAmount = command.amount;
 
     switch (action) {
     default:
@@ -536,10 +560,12 @@ void Game<NumT>::toAct() { // 玩家筹码修改在Player的makeAction中处理
         }
         break;
     case RAISE:
-        if (betAmount >= playerChips) {
+        if (betAmount > playerChips) {
+            throw Error(10, "User Error: bet amount exceeds player chips.");
+        }
+        if (betAmount == playerChips) {
             atag[active] = true; 
             players[active]->setChips(0);
-            betAmount = playerChips;
             if (playerChips <= chipsToCall) { // 全下跟注
                 action = CALL;
                 call(playerChips);
@@ -565,59 +591,184 @@ void Game<NumT>::toAct() { // 玩家筹码修改在Player的makeAction中处理
 }
 
 template<typename NumT>
-void Game<NumT>::afterEnd() {
-    if (!isEnd()) return;
+void Game<NumT>::submitAction(const ActionCommand& command) {
+    if (isEnd()) throw Error(7, "System Error: round has ended");
 
-    auto sidePots = calculateSidePots();
+    const auto request = decisionRequest();
+    if (std::find(request.legalActions.begin(), request.legalActions.end(), command.action)
+            == request.legalActions.end()) {
+        throw Error(6, "System Error: action is not legal in the current state.");
+    }
+    if (command.action == RAISE
+            && (command.amount < request.minRaise || command.amount > request.maxRaise)) {
+        throw Error(10, "User Error: invalid bet amount.");
+    }
+    applyAction(command);
+}
 
-    // 终端输出
-    std::cout << "\nGame Over! Final Results:" << std::endl;
-    show();
+template<typename NumT>
+void Game<NumT>::advanceBot() {
+    if (isEnd()) throw Error(7, "System Error: round has ended");
+    if (isHumanTurn()) throw Error(8, "System Error: waiting for human action.");
 
-    // 按边池分发筹码
+    const auto info = currentDecision();
+    int betAmount = 0;
+    ACTION action = players[active]->makeAction(info, betAmount);
+    if (action == RAISE) {
+        betAmount = std::min(betAmount, players[active]->getChips());
+        if (betAmount <= info.chipsToCall) action = CALL;
+    }
+    submitAction({action, betAmount});
+}
+
+template<typename NumT>
+void Game<NumT>::toAct() {
+    const auto info = currentDecision();
+    int betAmount = 0;
+    ACTION action = players[active]->makeAction(info, betAmount);
+    if (action == RAISE) {
+        betAmount = std::min(betAmount, players[active]->getChips());
+        if (!isHumanTurn() && betAmount <= info.chipsToCall) action = CALL;
+    }
+    submitAction({action, betAmount});
+}
+
+template<typename NumT>
+TableSnapshot Game<NumT>::snapshot() const {
+    TableSnapshot result;
+    result.stateCode = stateCode;
+    result.state = stateStr[stateCode];
+    result.pot = getPot();
+    result.dealerIndex = dealer;
+    result.activePlayerIndex = isEnd() ? -1 : active;
+    result.humanPlayerIndex = hpi;
+    result.roundEnded = isEnd();
+    result.roundSettled = roundSettled;
+    result.awaitingHumanAction = isHumanTurn();
+    if (!isEnd()) result.decision = decisionRequest();
+
+    for (const auto& card : deck_.getPubCards()) {
+        CardSnapshot cardView;
+        cardView.visible = card.show;
+        if (cardView.visible) {
+            cardView.rank = static_cast<int>(card.getNum());
+            cardView.suit = static_cast<int>(card.getSuit());
+        }
+        result.publicCards.push_back(cardView);
+    }
+
+    for (int i = 0; i < playerNum; i++) {
+        PlayerSnapshot playerView;
+        playerView.index = i;
+        playerView.name = players[i]->getName();
+        playerView.position = pos[i];
+        playerView.chips = players[i]->getChips();
+        playerView.committed = getPlayerCommited(i);
+        playerView.folded = ftag[i];
+        playerView.allIn = atag[i];
+        playerView.active = !isEnd() && i == active;
+        playerView.human = i == hpi;
+        playerView.lastAction = players[i]->getLastAction();
+        playerView.hasLastAction = playerView.lastAction.id >= 0;
+
+        const bool revealCards = i == hpi || isEnd();
+        if (revealCards) {
+            std::ostringstream handDescription;
+            handDescription << HandType<NumT>::evaluate(getHands(i));
+            playerView.handDescription = handDescription.str();
+        }
+        for (const auto& card : hands[i]) {
+            CardSnapshot cardView;
+            cardView.visible = revealCards;
+            if (revealCards) {
+                cardView.rank = static_cast<int>(card.getNum());
+                cardView.suit = static_cast<int>(card.getSuit());
+            }
+            playerView.cards.push_back(cardView);
+        }
+        result.players.push_back(std::move(playerView));
+    }
+
+    result.sidePots = calculateSidePots();
+    return result;
+}
+
+template<typename NumT>
+RoundResult Game<NumT>::settleRound() {
+    if (!isEnd()) return {};
+    if (roundSettled) return roundResult_;
+
+    roundResult_ = {};
+    roundResult_.settled = true;
+    const auto sidePots = calculateSidePots();
+
     for (size_t pi = 0; pi < sidePots.size(); pi++) {
-        const auto& sp = sidePots[pi];
-        auto winners = getWinners(sp.eligiblePlayers);
+        const auto& sidePot = sidePots[pi];
+        PotResult potResult;
+        potResult.amount = sidePot.amount;
+        potResult.eligiblePlayers = sidePot.eligiblePlayers;
+        potResult.winners = getWinners(sidePot.eligiblePlayers);
+        if (potResult.winners.empty()) continue;
 
-        if (winners.empty()) continue;
-
-        int share = sp.amount / winners.size();
-        int remainder = sp.amount - share * winners.size();
-
-        for (size_t i = 0; i < winners.size(); i++) {
-            int award = share + (i == 0 ? remainder : 0);
-            players[winners[i]]->addChips(award);
+        const int share = sidePot.amount / static_cast<int>(potResult.winners.size());
+        const int remainder = sidePot.amount - share * static_cast<int>(potResult.winners.size());
+        for (size_t i = 0; i < potResult.winners.size(); i++) {
+            const int award = share + (i == 0 ? remainder : 0);
+            const int winner = potResult.winners[i];
+            players[winner]->addChips(award);
+            potResult.awards.push_back({winner, award});
         }
-
-        // 输出每个池的结果
-        std::string potLabel = (pi == 0) ? "Main pot" : ("Side pot " + std::to_string(pi));
-        std::cout << potLabel << " (" << sp.amount << " chips) — ";
-        for (size_t i = 0; i < winners.size(); i++) {
-            if (i > 0) std::cout << ", ";
-            std::cout << players[winners[i]]->getName();
-        }
-        std::cout << " won " << share << " each" << (remainder > 0 ? " (+" + std::to_string(remainder) + " remainder)" : "") << std::endl;
 
         if (g_log) {
-            std::string logStr = potLabel + " (" + std::to_string(sp.amount) + " chips) — eligible: [";
-            for (size_t i = 0; i < sp.eligiblePlayers.size(); i++) {
+            const std::string potLabel = pi == 0 ? "Main pot" : "Side pot " + std::to_string(pi);
+            std::string logStr = potLabel + " (" + std::to_string(sidePot.amount) + " chips) - eligible: [";
+            for (size_t i = 0; i < sidePot.eligiblePlayers.size(); i++) {
                 if (i > 0) logStr += ", ";
-                logStr += players[sp.eligiblePlayers[i]]->getName();
+                logStr += players[sidePot.eligiblePlayers[i]]->getName();
             }
-            logStr += "] — winners: ";
-            for (size_t i = 0; i < winners.size(); i++) {
+            logStr += "] - winners: ";
+            for (size_t i = 0; i < potResult.winners.size(); i++) {
                 if (i > 0) logStr += ", ";
-                logStr += players[winners[i]]->getName();
+                logStr += players[potResult.winners[i]]->getName();
             }
             g_log->writeLine(logStr);
         }
+        roundResult_.pots.push_back(std::move(potResult));
     }
 
     if (players[hpi]->getChips() == 0) {
         players[hpi]->setChips(inic);
-        std::cout << "Unfortunately, you lost all chips. Chips Topped up." << std::endl;
+        roundResult_.humanToppedUp = true;
         if (g_log)
             g_log->writeLine("Unfortunately, you lost all chips. Chips Topped up.");
+    }
+    roundSettled = true;
+    return roundResult_;
+}
+
+template<typename NumT>
+void Game<NumT>::afterEnd() {
+    if (!isEnd()) return;
+
+    // 终端输出
+    std::cout << "\nGame Over! Final Results:" << std::endl;
+    show();
+    const RoundResult result = settleRound();
+
+    for (size_t pi = 0; pi < result.pots.size(); pi++) {
+        const auto& pot = result.pots[pi];
+        std::string potLabel = (pi == 0) ? "Main pot" : ("Side pot " + std::to_string(pi));
+        std::cout << potLabel << " (" << pot.amount << " chips) - ";
+        for (size_t i = 0; i < pot.awards.size(); i++) {
+            if (i > 0) std::cout << ", ";
+            std::cout << players[pot.awards[i].playerIndex]->getName()
+                      << " won " << pot.awards[i].amount;
+        }
+        std::cout << std::endl;
+    }
+
+    if (result.humanToppedUp) {
+        std::cout << "Unfortunately, you lost all chips. Chips Topped up." << std::endl;
     }
 }
 
@@ -625,6 +776,8 @@ template<typename NumT>
 void Game<NumT>::nextRound() {
     if (g_log) g_log->writeLine("--- New Round ---");
     stateCode = 0;
+    roundSettled = false;
+    roundResult_ = {};
     dealer = (dealer + 1) % playerNum;
     active = (dealer + 3) % playerNum;
     reset_tags();

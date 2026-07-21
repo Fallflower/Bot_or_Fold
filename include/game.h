@@ -7,13 +7,9 @@
 #include "humanPlayer.h"
 #include "botPlayer.h"
 #include "gameLog.h"
+#include "gameState.h"
 #include <memory>
 #include <iostream>
-
-struct SidePot {
-    int amount;
-    std::vector<int> eligiblePlayers;
-};
 
 extern const std::string stateStr[];
 
@@ -40,12 +36,18 @@ private:
     bool *ctag;     // check tags
     bool *atag;     // all-in tags
     int raiseCount; // 当前轮的加注次数（0=none\blind, 1=open, 2=3-bet, ...)
+    bool roundSettled = false;
+    RoundResult roundResult_;
 
     void init_game();
     void reset_tags();
     void init_players(const HumanPlayer<NumT>&, const int&);
     void init_blinds();
     void checkState();
+    void applyAction(const ActionCommand& command);
+    void fold();
+    void call(const int&);
+    void bet(const int&);
 
     int getPlayerCommited(const int& pi) const {
         int sum = 0;
@@ -79,12 +81,16 @@ public:
     void show(std::ostream& out = std::cout) const;
     void showPlayerView(std::ostream& out = std::cout) const;
     int getPot() const;
-    int getChipsToCall() const { return commit[stateCode] - chips[active][stateCode]; }
+    int getChipsToCall() const { return isEnd() ? 0 : commit[stateCode] - chips[active][stateCode]; }
     int getState() const { return stateCode; }
 
-    void fold();
-    void call(const int&);
-    void bet(const int&);
+    gameInfo<NumT> currentDecision() const;
+    DecisionRequest decisionRequest() const;
+    void submitAction(const ActionCommand& command);
+    void advanceBot();
+    bool isHumanTurn() const { return !isEnd() && active == hpi; }
+    TableSnapshot snapshot() const;
+    RoundResult settleRound();
 
     void toAct();
     void afterEnd();
