@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project(Holdem LANGUAGES CXX)
+project(Holdem LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -38,6 +38,26 @@ target_include_directories(holdem_core PUBLIC
 
 target_compile_options(holdem_core PRIVATE
     -Wall -Wextra
+)
+
+# ============================================================================
+# EUI-NEO desktop application
+# ============================================================================
+
+add_subdirectory(external/EUI-NEO)
+
+if(MINGW AND TARGET harfbuzz)
+    target_compile_options(harfbuzz PRIVATE -Wa,-mbig-obj)
+endif()
+
+add_executable(holdem_gui
+    external/EUI-NEO/core/app/glfw_app_main.cpp
+    src/gui/app.cpp
+)
+target_link_libraries(holdem_gui PRIVATE holdem_core)
+eui_neo_configure_app(holdem_gui)
+eui_neo_copy_app_assets(holdem_gui
+    "${CMAKE_CURRENT_SOURCE_DIR}/external/EUI-NEO/assets"
 )
 
 include(CTest)
