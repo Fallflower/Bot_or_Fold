@@ -16,6 +16,7 @@ set(HOLDEM_CORE_SOURCES
     src/humanPlayer.cpp
     src/botPlayer.cpp
     src/game.cpp
+    src/gameController.cpp
     src/position.cpp
 )
 
@@ -44,6 +45,10 @@ if(BUILD_TESTING)
     add_executable(game_api_test tests/game_api_test.cpp)
     target_link_libraries(game_api_test PRIVATE holdem_core)
     add_test(NAME game_api COMMAND game_api_test)
+
+    add_executable(game_controller_test tests/game_controller_test.cpp)
+    target_link_libraries(game_controller_test PRIVATE holdem_core)
+    add_test(NAME game_controller COMMAND game_controller_test)
 endif()
 
 # ============================================================================
