@@ -62,12 +62,12 @@ constexpr float kTableWidthRatio = 0.77f;
 constexpr float kTableHeightRatio = 0.69f;
 
 // 玩家信息框尺寸。
-// 8/9 人桌使用 crowded 宽度，人数较少时使用 normal 宽度。
+// 8、9 人桌使用 crowded 宽度，人数较少时使用 normal 宽度。
 constexpr int kCrowdedPlayerCount = 8;
-constexpr float kCrowdedSeatWidthRatio = 0.145f;
-constexpr float kNormalSeatWidthRatio = 0.19f;
-constexpr float kSeatMinWidth = 150.0f;
-constexpr float kSeatMaxWidth = 300.0f;
+constexpr float kCrowdedSeatWidthRatio = 0.18f;
+constexpr float kNormalSeatWidthRatio = 0.24f;
+constexpr float kSeatMinWidth = 100.0f;
+constexpr float kSeatMaxWidth = 500.0f;
 // 增大该值会增加整个玩家信息框的高度。
 constexpr float kSeatHeightToWidth = 0.56f;
 
@@ -77,6 +77,15 @@ constexpr float kSeatRadiusYRatio = 0.34f;
 constexpr float kSeatHorizontalEdgeReserve = 0.58f;
 constexpr float kSeatVerticalEdgeReserve = 0.60f;
 constexpr float kSeatCenterYRatio = 0.47f;
+
+// 9 人桌的局部座位微调。
+// 相对位置编号：人类玩家为 0，从人类位置开始顺时针依次为 1...8。
+// 1/8 位于人类两侧：向下并略微向左右外侧移动。
+constexpr float kNineSeatLowerSideOutwardXRatio = 0.012f;
+constexpr float kNineSeatLowerSideDownYRatio = 0.045f;
+// 3/6 位于左上和右上：分别向左上、右上移动。
+constexpr float kNineSeatUpperCornerOutwardXRatio = 0.022f;
+constexpr float kNineSeatUpperCornerUpYRatio = 0.035f;
 
 // 玩家手牌尺寸与位置。
 // 手牌首先尝试占满玩家框高度，再受最大宽度限制，避免挤入右侧文字区。
@@ -423,7 +432,8 @@ void composeSeat(eui::Ui& ui, const PlayerSnapshot& player, bool dealer,
             ui.text(id + ".name").position(
                     infoX, height * table_layout::kPlayerNameYRatio)
                 .size(infoWidth, height * table_layout::kPlayerNameHeightRatio)
-                .text(player.name + (player.human ? " (You)" : ""))
+                .text(player.name)
+                // .text(player.name + (player.human ? " (You)" : ""))
                 .fontSize(nameFont)
                 .lineHeight(nameFont + table_layout::kPlayerFontLineHeightExtra)
                 .color(kText)
@@ -570,11 +580,37 @@ void composeTableStage(eui::Ui& ui, const ControllerView& view,
                 const int relative = (player.index - view.table.humanPlayerIndex + count) % count;
                 const float angle = kPi * 0.5f
                     + 2.0f * kPi * static_cast<float>(relative) / static_cast<float>(count);
+
+                float offsetX = 0.0f;
+                float offsetY = 0.0f;
+                if (count == 9) {
+                    switch (relative) {
+                    case 1:
+                        offsetX = -width * table_layout::kNineSeatLowerSideOutwardXRatio;
+                        offsetY = height * table_layout::kNineSeatLowerSideDownYRatio;
+                        break;
+                    case 3:
+                        offsetX = -width * table_layout::kNineSeatUpperCornerOutwardXRatio;
+                        offsetY = -height * table_layout::kNineSeatUpperCornerUpYRatio;
+                        break;
+                    case 6:
+                        offsetX = width * table_layout::kNineSeatUpperCornerOutwardXRatio;
+                        offsetY = -height * table_layout::kNineSeatUpperCornerUpYRatio;
+                        break;
+                    case 8:
+                        offsetX = width * table_layout::kNineSeatLowerSideOutwardXRatio;
+                        offsetY = height * table_layout::kNineSeatLowerSideDownYRatio;
+                        break;
+                    default:
+                        break;
+                    }
+                }
+
                 const float seatX = std::clamp(
-                    centerX + radiusX * std::cos(angle) - seatWidth * 0.5f,
+                    centerX + radiusX * std::cos(angle) - seatWidth * 0.5f + offsetX,
                     2.0f, width - seatWidth - 2.0f);
                 const float seatY = std::clamp(
-                    centerY + radiusY * std::sin(angle) - seatHeight * 0.5f,
+                    centerY + radiusY * std::sin(angle) - seatHeight * 0.5f + offsetY,
                     2.0f, height - seatHeight - 2.0f);
                 composeSeat(ui, player, player.index == view.table.dealerIndex,
                             seatX, seatY, seatWidth, seatHeight);
