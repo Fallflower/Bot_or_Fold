@@ -1,6 +1,7 @@
 #include "handType.h"
 #include <vector>
 #include <map>
+#include <optional>
 #include <unordered_map>
 #include <algorithm>
 
@@ -200,8 +201,21 @@ HandType<NumT> HandType<NumT>::evaluate(const std::vector<Card<NumT>>& cards) { 
     if (trible==1 && pair) return {FULL_HOUSE, {triNum[0], pairNum[pair - 1]}};
     if (flush) {std::sort(flushCards.rbegin(), flushCards.rend()); return {FLUSH, flushCards}; }
     if (straight) return {STRAIGHT, {straiNum}};
-    if (trible == 1) return {THREE_OF_A_KIND, {triNum[0], highNum[0], highNum[1]}};
-    if (pair >= 2) return {TWO_PAIR, {pairNum[pair-1], pairNum[pair-2], highNum[0]}};
+    if (trible == 1) {
+        highNum.insert(highNum.begin(), triNum[0]);
+        return {THREE_OF_A_KIND, highNum};
+    }
+    if (pair >=2 ) {// 两队牌型，可能是第三对做kicker，可能无kicker(6张牌成3对)
+        std::optional<NumT> kicker;
+        if (highNum.size() > 0) kicker = highNum[0];
+        if (pair >= 3) {
+            NumT k = (kicker.has_value() && pairNum[0] < *kicker ? *kicker : pairNum[0]);
+            return {TWO_PAIR, {pairNum[2], pairNum[1], k}};
+        }
+        if (kicker)
+            return {TWO_PAIR, {pairNum[1], pairNum[0], *kicker}};
+        return {TWO_PAIR, {pairNum[1], pairNum[0]}};
+    }
     if (pair == 1) {
         std::vector<NumT> kt = {pairNum[0]};
         if (highNum.size() > 0)
@@ -219,7 +233,8 @@ int HandType<NumT>::compareHandType(const HandType& t1, const HandType& t2) {
         return r1 > r2 ? 1 : -1;
     }
 
-    for (size_t i = 0; i < t1.keys.size(); i++) {
+    size_t minSize = std::min({t1.keys.size(), t2.keys.size(), size_t(5)});
+    for (size_t i = 0; i < minSize; i++) {
         if (t1.keys[i] != t2.keys[i]) {
             return t1.keys[i] > t2.keys[i] ? 1 : -1;
         }

@@ -72,6 +72,10 @@ if(BUILD_TESTING)
     add_executable(game_controller_test tests/game_controller_test.cpp)
     target_link_libraries(game_controller_test PRIVATE holdem_core)
     add_test(NAME game_controller COMMAND game_controller_test)
+
+    add_executable(handType_evaluate_test tests/handType_evaluate_test.cpp)
+    target_link_libraries(handType_evaluate_test PRIVATE holdem_core)
+    add_test(NAME handType_evaluate COMMAND handType_evaluate_test)
 endif()
 
 # ============================================================================
