@@ -16,8 +16,8 @@ namespace {
 
 constexpr int kSetupWidth = 640;
 constexpr int kSetupHeight = 820;
-constexpr int kTableWidth = 1280;
-constexpr int kTableHeight = 820;
+constexpr int kTableWidth = 1920;
+constexpr int kTableHeight = 1080;
 constexpr float kPi = 3.14159265358979323846f;
 
 constexpr eui::Color kBackground{0.055f, 0.070f, 0.065f, 1.0f};
@@ -37,6 +37,97 @@ constexpr eui::Color kRedPressed{0.55f, 0.15f, 0.17f, 1.0f};
 constexpr eui::Color kGold{0.82f, 0.60f, 0.17f, 1.0f};
 constexpr eui::Color kGoldHover{0.91f, 0.68f, 0.22f, 1.0f};
 constexpr eui::Color kGoldPressed{0.70f, 0.49f, 0.12f, 1.0f};
+
+// ============================================================================
+// 牌桌布局手动调节区
+// ============================================================================
+// 比例值均基于 EUI 的逻辑尺寸（Screen 或父容器），不是显示器物理像素。
+// 调整时建议一次只修改一组：牌桌外框 -> 玩家框 -> 手牌 -> 公共牌。
+namespace table_layout {
+
+// 整个牌桌页面占窗口的比例；剩余空间作为四周留白。
+constexpr float kShellWidthRatio = 0.96f;
+constexpr float kShellHeightRatio = 0.96f;
+constexpr float kShellMinWidth = 640.0f;
+constexpr float kShellMinHeight = 360.0f;
+constexpr float kShellPadding = 14.0f;
+constexpr float kHeaderHeight = 44.0f;
+constexpr float kSectionGap = 8.0f;
+constexpr float kFooterHeight = 48.0f;
+
+// 绿色椭圆桌面相对于可用牌桌区域的尺寸和起点。
+constexpr float kTableXRatio = 0.115f;
+constexpr float kTableYRatio = 0.115f;
+constexpr float kTableWidthRatio = 0.77f;
+constexpr float kTableHeightRatio = 0.69f;
+
+// 玩家信息框尺寸。
+// 8/9 人桌使用 crowded 宽度，人数较少时使用 normal 宽度。
+constexpr int kCrowdedPlayerCount = 8;
+constexpr float kCrowdedSeatWidthRatio = 0.145f;
+constexpr float kNormalSeatWidthRatio = 0.19f;
+constexpr float kSeatMinWidth = 150.0f;
+constexpr float kSeatMaxWidth = 300.0f;
+// 增大该值会增加整个玩家信息框的高度。
+constexpr float kSeatHeightToWidth = 0.56f;
+
+// 玩家围绕桌面的椭圆半径。数值越大，玩家框越靠近窗口边缘。
+constexpr float kSeatRadiusXRatio = 0.39f;
+constexpr float kSeatRadiusYRatio = 0.34f;
+constexpr float kSeatHorizontalEdgeReserve = 0.58f;
+constexpr float kSeatVerticalEdgeReserve = 0.60f;
+constexpr float kSeatCenterYRatio = 0.47f;
+
+// 玩家手牌尺寸与位置。
+// 手牌首先尝试占满玩家框高度，再受最大宽度限制，避免挤入右侧文字区。
+constexpr float kCardHeightToWidth = 1.406f;
+constexpr float kHoleCardHeightRatio = 0.88f;
+constexpr float kHoleCardMaxWidthRatio = 0.34f;
+constexpr float kHoleCardXRatio = 0.025f;
+constexpr float kHoleCardYRatio = 0.06f;
+// 第二张牌相对第一张牌的步进；小于 1.0 会让两张牌轻微重叠。
+constexpr float kHoleCardStepRatio = 0.64f;
+
+// 玩家文字信息区的位置、宽度和字号。
+// 左移 kPlayerInfoXRatio 或增大 kPlayerInfoWidthRatio 会扩大右侧文字区。
+constexpr float kPlayerInfoXRatio = 0.62f;
+constexpr float kPlayerInfoWidthRatio = 0.35f;
+constexpr float kPlayerNameYRatio = 0.035f;
+constexpr float kPlayerNameHeightRatio = 0.15f;
+constexpr float kPlayerPositionYRatio = 0.205f;
+constexpr float kPlayerPositionHeightRatio = 0.13f;
+constexpr float kPlayerStackYRatio = 0.345f;
+constexpr float kPlayerStackHeightRatio = 0.13f;
+constexpr float kPlayerCommittedYRatio = 0.485f;
+constexpr float kPlayerCommittedHeightRatio = 0.13f;
+constexpr float kPlayerActionYRatio = 0.68f;
+constexpr float kPlayerActionHeightRatio = 0.25f;
+constexpr float kPlayerNameFontRatio = 0.068f;
+constexpr float kPlayerDetailFontRatio = 0.058f;
+constexpr float kPlayerNameFontMin = 14.0f;
+constexpr float kPlayerNameFontMax = 22.0f;
+constexpr float kPlayerDetailFontMin = 13.0f;
+constexpr float kPlayerDetailFontMax = 18.0f;
+constexpr float kPlayerFontLineHeightExtra = 3.0f;
+
+// Dealer 圆形标记尺寸及其相对玩家框右上角的偏移。
+constexpr float kDealerSizeRatio = 0.105f;
+constexpr float kDealerRightOffsetRatio = 0.85f;
+constexpr float kDealerTopOffsetRatio = 0.25f;
+
+// 公共牌尺寸。宽度同时受牌桌宽度和高度约束，取两者中较小值。
+constexpr float kCommunityCardWidthRatio = 0.066f;
+constexpr float kCommunityCardHeightLimitRatio = 0.20f;
+constexpr float kCommunityCardGapRatio = 0.14f;
+// 数值越大，公共牌整体越靠上。
+constexpr float kCommunityVerticalOffsetRatio = 0.68f;
+
+// 底池徽章相对于一张公共牌的大小。
+constexpr float kPotBadgeWidthRatio = 2.05f;
+constexpr float kPotBadgeHeightRatio = 0.30f;
+constexpr float kPotBadgeGapRatio = 0.10f;
+
+} // namespace table_layout
 
 struct UiState {
     std::string playerName = "Player";
@@ -304,37 +395,88 @@ void composeSeat(eui::Ui& ui, const PlayerSnapshot& player, bool dealer,
                                       : eui::Color{0.0f, 0.0f, 0.0f, 0.24f})
                 .build();
 
+            const float cardWidth = std::min(
+                height * table_layout::kHoleCardHeightRatio
+                    / table_layout::kCardHeightToWidth,
+                width * table_layout::kHoleCardMaxWidthRatio);
+            const float cardHeight = cardWidth * table_layout::kCardHeightToWidth;
+            const float cardX = width * table_layout::kHoleCardXRatio;
+            const float cardY = height * table_layout::kHoleCardYRatio;
+            const float cardStep = cardWidth * table_layout::kHoleCardStepRatio;
             const CardSnapshot* first = player.cards.empty() ? nullptr : &player.cards[0];
             const CardSnapshot* second = player.cards.size() < 2 ? nullptr : &player.cards[1];
-            composeCard(ui, id + ".card.0", first, 8.0f, 10.0f, 35.0f, 50.0f, true);
-            composeCard(ui, id + ".card.1", second, 39.0f, 10.0f, 35.0f, 50.0f, true);
+            composeCard(ui, id + ".card.0", first, cardX, cardY,
+                        cardWidth, cardHeight, true);
+            composeCard(ui, id + ".card.1", second, cardX + cardStep, cardY,
+                        cardWidth, cardHeight, true);
 
-            const float infoX = 82.0f;
-            const float infoWidth = width - infoX - 8.0f;
-            ui.text(id + ".name").position(infoX, 1.0f).size(infoWidth, 22.0f)
+            const float infoX = width * table_layout::kPlayerInfoXRatio;
+            const float infoWidth = width * table_layout::kPlayerInfoWidthRatio;
+            const float nameFont = std::clamp(
+                width * table_layout::kPlayerNameFontRatio,
+                table_layout::kPlayerNameFontMin,
+                table_layout::kPlayerNameFontMax);
+            const float detailFont = std::clamp(
+                width * table_layout::kPlayerDetailFontRatio,
+                table_layout::kPlayerDetailFontMin,
+                table_layout::kPlayerDetailFontMax);
+            ui.text(id + ".name").position(
+                    infoX, height * table_layout::kPlayerNameYRatio)
+                .size(infoWidth, height * table_layout::kPlayerNameHeightRatio)
                 .text(player.name + (player.human ? " (You)" : ""))
-                .fontSize(14.0f).lineHeight(18.0f).color(kText)
+                .fontSize(nameFont)
+                .lineHeight(nameFont + table_layout::kPlayerFontLineHeightExtra)
+                .color(kText)
                 .verticalAlign(eui::VerticalAlign::Center).build();
-            ui.text(id + ".position").position(infoX, 22.0f).size(infoWidth, 20.0f)
-                .text(compactPosition(player.position) + "  |  " + std::to_string(player.chips))
-                .fontSize(12.0f).lineHeight(16.0f).color(kMuted)
+            ui.text(id + ".position").position(
+                    infoX, height * table_layout::kPlayerPositionYRatio)
+                .size(infoWidth, height * table_layout::kPlayerPositionHeightRatio)
+                .text("Pos  " + compactPosition(player.position))
+                .fontSize(detailFont)
+                .lineHeight(detailFont + table_layout::kPlayerFontLineHeightExtra)
+                .color(kMuted)
                 .verticalAlign(eui::VerticalAlign::Center).build();
-            ui.text(id + ".committed").position(infoX, 42.0f).size(infoWidth, 18.0f)
-                .text("Bet " + std::to_string(player.committed))
-                .fontSize(12.0f).lineHeight(16.0f).color(kGold)
+            ui.text(id + ".stack").position(
+                    infoX, height * table_layout::kPlayerStackYRatio)
+                .size(infoWidth, height * table_layout::kPlayerStackHeightRatio)
+                .text("Stack  " + std::to_string(player.chips))
+                .fontSize(detailFont)
+                .lineHeight(detailFont + table_layout::kPlayerFontLineHeightExtra)
+                .color(kMuted)
                 .verticalAlign(eui::VerticalAlign::Center).build();
-            ui.text(id + ".action").position(8.0f, 65.0f).size(width - 16.0f, 22.0f)
-                .text(actionLabel(player)).fontSize(12.0f).lineHeight(16.0f)
+            ui.text(id + ".committed").position(
+                    infoX, height * table_layout::kPlayerCommittedYRatio)
+                .size(infoWidth, height * table_layout::kPlayerCommittedHeightRatio)
+                .text("Committed " + std::to_string(player.committed))
+                .fontSize(detailFont)
+                .lineHeight(detailFont + table_layout::kPlayerFontLineHeightExtra)
+                .color(kGold)
+                .verticalAlign(eui::VerticalAlign::Center).build();
+            ui.rect(id + ".action.bg").position(
+                    infoX, height * table_layout::kPlayerActionYRatio)
+                .size(infoWidth, height * table_layout::kPlayerActionHeightRatio)
+                .color({0.035f, 0.065f, 0.052f, 0.88f}).radius(6.0f).build();
+            ui.text(id + ".action").position(
+                    infoX, height * table_layout::kPlayerActionYRatio)
+                .size(infoWidth, height * table_layout::kPlayerActionHeightRatio)
+                .text(actionLabel(player)).fontSize(detailFont)
+                .lineHeight(detailFont + table_layout::kPlayerFontLineHeightExtra)
                 .color(player.folded ? kRedHover : kText)
                 .horizontalAlign(eui::HorizontalAlign::Center)
                 .verticalAlign(eui::VerticalAlign::Center).build();
 
             if (dealer) {
-                ui.rect(id + ".dealer.bg").position(width - 27.0f, -7.0f)
-                    .size(26.0f, 26.0f).color(kGold).radius(13.0f)
+                const float dealerSize = width * table_layout::kDealerSizeRatio;
+                ui.rect(id + ".dealer.bg").position(
+                        width - dealerSize * table_layout::kDealerRightOffsetRatio,
+                        -dealerSize * table_layout::kDealerTopOffsetRatio)
+                    .size(dealerSize, dealerSize).color(kGold).radius(dealerSize * 0.5f)
                     .border(1.0f, kText).build();
-                ui.text(id + ".dealer.text").position(width - 27.0f, -7.0f)
-                    .size(26.0f, 26.0f).text("D").fontSize(13.0f).lineHeight(16.0f)
+                ui.text(id + ".dealer.text").position(
+                        width - dealerSize * table_layout::kDealerRightOffsetRatio,
+                        -dealerSize * table_layout::kDealerTopOffsetRatio)
+                    .size(dealerSize, dealerSize).text("D")
+                    .fontSize(dealerSize * 0.50f).lineHeight(dealerSize * 0.62f)
                     .color(kBackground).horizontalAlign(eui::HorizontalAlign::Center)
                     .verticalAlign(eui::VerticalAlign::Center).build();
             }
@@ -343,12 +485,15 @@ void composeSeat(eui::Ui& ui, const PlayerSnapshot& player, bool dealer,
 
 void composeCommunity(eui::Ui& ui, const TableSnapshot& table,
                       float stageWidth, float stageHeight) {
-    constexpr float cardWidth = 62.0f;
-    constexpr float cardHeight = 88.0f;
-    constexpr float cardGap = 9.0f;
+    const float cardWidth = std::min(
+        stageWidth * table_layout::kCommunityCardWidthRatio,
+        stageHeight * table_layout::kCommunityCardHeightLimitRatio);
+    const float cardHeight = cardWidth * table_layout::kCardHeightToWidth;
+    const float cardGap = cardWidth * table_layout::kCommunityCardGapRatio;
     const float cardsWidth = cardWidth * 5.0f + cardGap * 4.0f;
     const float cardsX = (stageWidth - cardsWidth) * 0.5f;
-    const float cardsY = stageHeight * 0.5f - 72.0f;
+    const float cardsY = stageHeight * 0.5f
+        - cardHeight * table_layout::kCommunityVerticalOffsetRatio;
 
     for (int i = 0; i < 5; ++i) {
         const CardSnapshot* card = i < static_cast<int>(table.publicCards.size())
@@ -363,14 +508,18 @@ void composeCommunity(eui::Ui& ui, const TableSnapshot& table,
         ? "Total pot  " + std::to_string(table.pot) + "  |  "
             + std::to_string(table.sidePots.size()) + " pots"
         : "Pot  " + std::to_string(table.pot);
+    const float badgeWidth = cardWidth * table_layout::kPotBadgeWidthRatio;
+    const float badgeHeight = cardHeight * table_layout::kPotBadgeHeightRatio;
     ui.stack("game.pot.badge")
-        .position(stageWidth * 0.5f - 118.0f, cardsY + cardHeight + 15.0f)
-        .size(236.0f, 42.0f)
+        .position(stageWidth * 0.5f - badgeWidth * 0.5f,
+                  cardsY + cardHeight + cardHeight * table_layout::kPotBadgeGapRatio)
+        .size(badgeWidth, badgeHeight)
         .content([&] {
-            ui.rect("game.pot.badge.bg").size(236.0f, 42.0f)
-                .color({0.025f, 0.11f, 0.065f, 0.92f}).radius(21.0f)
+            ui.rect("game.pot.badge.bg").size(badgeWidth, badgeHeight)
+                .color({0.025f, 0.11f, 0.065f, 0.92f}).radius(badgeHeight * 0.5f)
                 .border(1.0f, kGold).build();
-            text(ui, "game.pot.badge.text", potText, 236.0f, 42.0f, 17.0f,
+            text(ui, "game.pot.badge.text", potText, badgeWidth, badgeHeight,
+                 std::clamp(cardWidth * 0.19f, 13.0f, 19.0f),
                  kGold, eui::HorizontalAlign::Center);
         }).build();
 }
@@ -380,10 +529,10 @@ void composeTableStage(eui::Ui& ui, const ControllerView& view,
     ui.stack("game.table.stage")
         .position(x, y).size(width, height)
         .content([&] {
-            const float tableX = width * 0.115f;
-            const float tableY = height * 0.115f;
-            const float tableWidth = width * 0.77f;
-            const float tableHeight = height * 0.69f;
+            const float tableX = width * table_layout::kTableXRatio;
+            const float tableY = height * table_layout::kTableYRatio;
+            const float tableWidth = width * table_layout::kTableWidthRatio;
+            const float tableHeight = height * table_layout::kTableHeightRatio;
             ui.rect("game.table.shadow")
                 .position(tableX - 10.0f, tableY + 8.0f)
                 .size(tableWidth + 20.0f, tableHeight + 18.0f)
@@ -401,13 +550,22 @@ void composeTableStage(eui::Ui& ui, const ControllerView& view,
 
             composeCommunity(ui, view.table, width, height);
 
-            constexpr float seatWidth = 184.0f;
-            constexpr float seatHeight = 92.0f;
-            const float radiusX = width * 0.425f;
-            const float radiusY = height * 0.365f;
-            const float centerX = width * 0.5f;
-            const float centerY = height * 0.47f;
             const int count = static_cast<int>(view.table.players.size());
+            const float seatWidth = std::clamp(
+                width * (count >= table_layout::kCrowdedPlayerCount
+                    ? table_layout::kCrowdedSeatWidthRatio
+                    : table_layout::kNormalSeatWidthRatio),
+                table_layout::kSeatMinWidth,
+                table_layout::kSeatMaxWidth);
+            const float seatHeight = seatWidth * table_layout::kSeatHeightToWidth;
+            const float radiusX = std::min(
+                width * table_layout::kSeatRadiusXRatio,
+                width * 0.5f - seatWidth * table_layout::kSeatHorizontalEdgeReserve);
+            const float radiusY = std::min(
+                height * table_layout::kSeatRadiusYRatio,
+                height * 0.5f - seatHeight * table_layout::kSeatVerticalEdgeReserve);
+            const float centerX = width * 0.5f;
+            const float centerY = height * table_layout::kSeatCenterYRatio;
             for (const PlayerSnapshot& player : view.table.players) {
                 const int relative = (player.index - view.table.humanPlayerIndex + count) % count;
                 const float angle = kPi * 0.5f
@@ -607,14 +765,23 @@ void composeResult(eui::Ui& ui, const eui::Screen& screen, const ControllerView&
 
 void composeGame(eui::Ui& ui, const eui::Screen& screen, const ControllerView& view) {
     syncRaiseAmount(view);
-    const float shellWidth = std::min(1256.0f, std::max(940.0f, screen.width - 24.0f));
-    const float shellHeight = std::min(796.0f, std::max(680.0f, screen.height - 24.0f));
-    const float innerWidth = shellWidth - 28.0f;
-    const float stageHeight = shellHeight - 136.0f;
+    const float shellWidth = std::max(
+        table_layout::kShellMinWidth,
+        screen.width * table_layout::kShellWidthRatio);
+    const float shellHeight = std::max(
+        table_layout::kShellMinHeight,
+        screen.height * table_layout::kShellHeightRatio);
+    const float innerWidth = shellWidth - table_layout::kShellPadding * 2.0f;
+    const float stageY = table_layout::kShellPadding
+        + table_layout::kHeaderHeight + table_layout::kSectionGap;
+    const float stageHeight = shellHeight
+        - table_layout::kShellPadding * 2.0f
+        - table_layout::kHeaderHeight
+        - table_layout::kFooterHeight
+        - table_layout::kSectionGap * 2.0f;
     const float shellX = std::max(0.0f, (screen.width - shellWidth) * 0.5f);
     const float shellY = std::max(0.0f, (screen.height - shellHeight) * 0.5f);
-    const float stageY = 66.0f;
-    const float footerY = stageY + stageHeight + 8.0f;
+    const float footerY = stageY + stageHeight + table_layout::kSectionGap;
 
     ui.stack("game.root")
         .size(screen.width, screen.height)
@@ -625,7 +792,8 @@ void composeGame(eui::Ui& ui, const eui::Screen& screen, const ControllerView& v
                 .position(shellX, shellY).size(shellWidth, shellHeight)
                 .content([&] {
                     ui.row("game.header")
-                        .position(14.0f, 14.0f).size(innerWidth, 44.0f)
+                        .position(table_layout::kShellPadding, table_layout::kShellPadding)
+                        .size(innerWidth, table_layout::kHeaderHeight)
                         .alignItems(eui::Align::CENTER)
                         .content([&] {
                             text(ui, "game.title", "Bot or Fold", innerWidth * 0.32f,
@@ -643,10 +811,12 @@ void composeGame(eui::Ui& ui, const eui::Screen& screen, const ControllerView& v
                                  eui::HorizontalAlign::Right);
                         }).build();
 
-                    composeTableStage(ui, view, 14.0f, stageY, innerWidth, stageHeight);
+                    composeTableStage(ui, view, table_layout::kShellPadding,
+                                      stageY, innerWidth, stageHeight);
 
                     ui.stack("game.footer")
-                        .position(14.0f, footerY).size(innerWidth, 48.0f)
+                        .position(table_layout::kShellPadding, footerY)
+                        .size(innerWidth, table_layout::kFooterHeight)
                         .content([&] {
                             if (view.state == ControllerState::WaitingForHuman)
                                 humanActions(ui, view, innerWidth);
