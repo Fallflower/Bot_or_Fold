@@ -59,6 +59,9 @@ eui_neo_configure_app(holdem_gui)
 eui_neo_copy_app_assets(holdem_gui
     "${CMAKE_CURRENT_SOURCE_DIR}/external/EUI-NEO/assets"
 )
+eui_neo_copy_app_assets(holdem_gui
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+)
 
 include(CTest)
 if(BUILD_TESTING)
