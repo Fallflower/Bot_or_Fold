@@ -138,6 +138,18 @@ constexpr float kPotBadgeGapRatio = 0.10f;
 
 } // namespace table_layout
 
+namespace action_layout {
+
+// Raise 滑动条调节参数。
+constexpr float kRaiseSliderHeight = 42.0f;
+constexpr float kRaiseSliderTrackHeightRatio = 0.16f;
+constexpr float kRaiseSliderKnobHeightRatio = 0.55f;
+// 每次滚轮滚动约改变可加注区间的 1%，同时保证至少改变 1 筹码。
+constexpr int kRaiseWheelStepsPerRange = 100;
+constexpr int kRaiseWheelMaxNotches = 5;
+
+} // namespace action_layout
+
 struct UiState {
     std::string playerName = "Player";
     int playerCount = 6;
@@ -149,7 +161,15 @@ struct UiState {
     int decisionStreet = -1;
     int decisionToCall = -1;
     bool botTaskPending = false;
-    bool resultOpen = false;
+    bool autoSettlementPending = false;
+    // 新决策第一次操作 Raise 时强制刷新一次完整渲染缓存。
+    bool raiseInteractionNeedsFullPaint = true;
+    // 上一帧的游戏视图签名，用于识别会改变 UI 结构的状态切换。
+    bool paintSignatureInitialized = false;
+    bool paintedHasGame = false;
+    ControllerState paintedControllerState = ControllerState::Setup;
+    int paintedActivePlayer = -2;
+    int paintedStreet = -2;
 };
 
 GameController controller;
@@ -205,6 +225,38 @@ std::string actionLabel(const PlayerSnapshot& player) {
     return label;
 }
 
+bool isRoundWinner(const RoundResult& result, int playerIndex) {
+    for (const PotResult& pot : result.pots) {
+        if (std::find(pot.winners.begin(), pot.winners.end(), playerIndex)
+                != pot.winners.end()) {
+            return true;
+        }
+        for (const PlayerAward& award : pot.awards) {
+            if (award.playerIndex == playerIndex && award.amount > 0) return true;
+        }
+    }
+    return false;
+}
+
+std::string roundWinnersText(const RoundResult& result,
+                             const std::vector<PlayerSnapshot>& players) {
+    std::string summary;
+    for (const PotResult& pot : result.pots) {
+        for (const PlayerAward& award : pot.awards) {
+            if (award.amount <= 0) continue;
+            if (!summary.empty()) summary += "   ";
+            if (award.playerIndex >= 0
+                && award.playerIndex < static_cast<int>(players.size())) {
+                summary += players[static_cast<size_t>(award.playerIndex)].name;
+            } else {
+                summary += "Player " + std::to_string(award.playerIndex + 1);
+            }
+            summary += "  +" + std::to_string(award.amount);
+        }
+    }
+    return summary.empty() ? "No award information" : summary;
+}
+
 std::string cardSource(const CardSnapshot& card) {
     if (!card.visible || card.rank < 0 || card.suit < 0)
         return "assets/pokers/back.png";
@@ -241,6 +293,31 @@ void syncRaiseAmount(const ControllerView& view) {
     state.decisionStreet = view.table.stateCode;
     state.decisionToCall = decision.chipsToCall;
     state.raiseAmount = decision.minRaise > 0 ? decision.minRaise : 0;
+    state.raiseInteractionNeedsFullPaint = true;
+}
+
+void requestFullPaintForViewTransition(const ControllerView& view) {
+    const int activePlayer = view.hasGame ? view.table.activePlayerIndex : -1;
+    const int street = view.hasGame ? view.table.stateCode : -1;
+    const bool changed = !state.paintSignatureInitialized
+        || state.paintedHasGame != view.hasGame
+        || state.paintedControllerState != view.state
+        || state.paintedActivePlayer != activePlayer
+        || state.paintedStreet != street;
+    if (!changed) return;
+
+    state.paintSignatureInitialized = true;
+    state.paintedHasGame = view.hasGame;
+    state.paintedControllerState = view.state;
+    state.paintedActivePlayer = activePlayer;
+    state.paintedStreet = street;
+    app::detail::requestFullPaint();
+}
+
+void requestFirstRaiseInteractionFullPaint() {
+    if (!state.raiseInteractionNeedsFullPaint) return;
+    state.raiseInteractionNeedsFullPaint = false;
+    app::detail::requestFullPaint();
 }
 
 void scheduleBot(const ControllerView& view) {
@@ -252,6 +329,24 @@ void scheduleBot(const ControllerView& view) {
         [] { return controller.advanceBot(); },
         [](const app::async::Result<bool>&) { state.botTaskPending = false; });
     if (!accepted) state.botTaskPending = false;
+}
+
+void settleEndedRoundIfNeeded(const ControllerView& view) {
+    if (!view.hasGame || view.state == ControllerState::Error
+        || !view.table.roundEnded || view.table.roundSettled
+        || state.autoSettlementPending) {
+        return;
+    }
+
+    state.autoSettlementPending = true;
+    const bool settled = controller.settleRound();
+    state.autoSettlementPending = false;
+    if (settled) {
+        // settleRound() publishes a new view; schedule the next frame so the
+        // table immediately shows all cards and the winner highlight.
+        app::detail::requestFullPaint();
+        app::requestUpdate();
+    }
 }
 
 void setupRow(eui::Ui& ui, const std::string& id, const std::string& label,
@@ -375,7 +470,6 @@ void composeSetup(eui::Ui& ui, const eui::Screen& screen) {
                                         ? GameMode::Standard : GameMode::ShortDeck;
                                     if (controller.startGame(config)) {
                                         state.decisionPlayer = -1;
-                                        state.resultOpen = false;
                                         resizeMainWindow(kTableWidth, kTableHeight);
                                     }
                                 }).build();
@@ -385,6 +479,7 @@ void composeSetup(eui::Ui& ui, const eui::Screen& screen) {
 }
 
 void composeSeat(eui::Ui& ui, const PlayerSnapshot& player, bool dealer,
+                 bool winner, bool showCards,
                  float x, float y, float width, float height) {
     const std::string id = "game.seat." + std::to_string(player.index);
     eui::Color background = player.human
@@ -394,14 +489,15 @@ void composeSeat(eui::Ui& ui, const PlayerSnapshot& player, bool dealer,
 
     ui.stack(id)
         .position(x, y).size(width, height)
-        .opacity(player.folded ? 0.74f : 1.0f)
         .content([&] {
             ui.rect(id + ".bg")
                 .size(width, height).color(background).radius(9.0f)
-                .border(player.active ? 2.0f : 1.0f, player.active ? kGold : kBorder)
-                .shadow(player.active ? 18.0f : 8.0f, 0.0f, 4.0f,
-                        player.active ? eui::Color{0.85f, 0.62f, 0.14f, 0.34f}
-                                      : eui::Color{0.0f, 0.0f, 0.0f, 0.24f})
+                .border(winner ? 3.0f : (player.active ? 2.0f : 1.0f),
+                        winner ? kRedHover : (player.active ? kGold : kBorder))
+                .shadow(winner ? 20.0f : (player.active ? 18.0f : 8.0f), 0.0f, 4.0f,
+                        winner ? eui::Color{0.76f, 0.25f, 0.27f, 0.42f}
+                               : (player.active ? eui::Color{0.85f, 0.62f, 0.14f, 0.34f}
+                                                  : eui::Color{0.0f, 0.0f, 0.0f, 0.24f}))
                 .build();
 
             const float cardWidth = std::min(
@@ -414,10 +510,15 @@ void composeSeat(eui::Ui& ui, const PlayerSnapshot& player, bool dealer,
             const float cardStep = cardWidth * table_layout::kHoleCardStepRatio;
             const CardSnapshot* first = player.cards.empty() ? nullptr : &player.cards[0];
             const CardSnapshot* second = player.cards.size() < 2 ? nullptr : &player.cards[1];
-            composeCard(ui, id + ".card.0", first, cardX, cardY,
-                        cardWidth, cardHeight, true);
-            composeCard(ui, id + ".card.1", second, cardX + cardStep, cardY,
-                        cardWidth, cardHeight, true);
+            // Folded players hide both face-down backs and hole cards during play.
+            // Once the round is settled, showCards is true and every player's
+            // revealed cards are rendered at full opacity.
+            if (showCards || !player.folded) {
+                composeCard(ui, id + ".card.0", first, cardX, cardY,
+                            cardWidth, cardHeight, true);
+                composeCard(ui, id + ".card.1", second, cardX + cardStep, cardY,
+                            cardWidth, cardHeight, true);
+            }
 
             const float infoX = width * table_layout::kPlayerInfoXRatio;
             const float infoWidth = width * table_layout::kPlayerInfoWidthRatio;
@@ -494,6 +595,8 @@ void composeSeat(eui::Ui& ui, const PlayerSnapshot& player, bool dealer,
 }
 
 void composeCommunity(eui::Ui& ui, const TableSnapshot& table,
+                      const RoundResult& result,
+                      const std::vector<PlayerSnapshot>& players,
                       float stageWidth, float stageHeight) {
     const float cardWidth = std::min(
         stageWidth * table_layout::kCommunityCardWidthRatio,
@@ -532,6 +635,28 @@ void composeCommunity(eui::Ui& ui, const TableSnapshot& table,
                  std::clamp(cardWidth * 0.19f, 13.0f, 19.0f),
                  kGold, eui::HorizontalAlign::Center);
         }).build();
+
+    if (result.settled) {
+        const float resultWidth = badgeWidth * 2.30f;
+        const float resultHeight = badgeHeight * 1.35f;
+        const float resultY = cardsY + cardHeight + badgeHeight
+            + cardHeight * 0.24f;
+        ui.stack("game.round.result")
+            .position(stageWidth * 0.5f - resultWidth * 0.5f, resultY)
+            .size(resultWidth, resultHeight)
+            .content([&] {
+                ui.rect("game.round.result.bg")
+                    .size(resultWidth, resultHeight)
+                    .color({0.12f, 0.035f, 0.04f, 0.90f})
+                    .radius(resultHeight * 0.25f)
+                    .border(1.0f, kRedHover).build();
+                text(ui, "game.round.result.text",
+                     "Winner  " + roundWinnersText(result, players),
+                     resultWidth, resultHeight,
+                     std::clamp(cardWidth * 0.18f, 13.0f, 18.0f),
+                     kText, eui::HorizontalAlign::Center);
+            }).build();
+    }
 }
 
 void composeTableStage(eui::Ui& ui, const ControllerView& view,
@@ -558,7 +683,8 @@ void composeTableStage(eui::Ui& ui, const ControllerView& view,
                 .color(kFelt).radius(tableHeight * 0.5f)
                 .border(2.0f, {0.20f, 0.64f, 0.37f, 0.58f}).build();
 
-            composeCommunity(ui, view.table, width, height);
+            composeCommunity(ui, view.table, view.roundResult, view.table.players,
+                             width, height);
 
             const int count = static_cast<int>(view.table.players.size());
             const float seatWidth = std::clamp(
@@ -613,7 +739,112 @@ void composeTableStage(eui::Ui& ui, const ControllerView& view,
                     centerY + radiusY * std::sin(angle) - seatHeight * 0.5f + offsetY,
                     2.0f, height - seatHeight - 2.0f);
                 composeSeat(ui, player, player.index == view.table.dealerIndex,
+                            isRoundWinner(view.roundResult, player.index),
+                            view.table.roundSettled,
                             seatX, seatY, seatWidth, seatHeight);
+            }
+        }).build();
+}
+
+int raiseAmountFromSlider(float value, int minimum, int maximum) {
+    if (maximum <= minimum) return minimum;
+    const float normalized = std::clamp(value, 0.0f, 1.0f);
+    return minimum + static_cast<int>(std::lround(
+        normalized * static_cast<float>(maximum - minimum)));
+}
+
+float raiseSliderValue(int amount, int minimum, int maximum) {
+    if (maximum <= minimum) return 1.0f;
+    return std::clamp(
+        static_cast<float>(amount - minimum) / static_cast<float>(maximum - minimum),
+        0.0f, 1.0f);
+}
+
+void composeRaiseSlider(eui::Ui& ui, const DecisionRequest& decision,
+                        bool enabled, float width) {
+    const std::string id = "game.action.raise.slider";
+    const float height = action_layout::kRaiseSliderHeight;
+
+    if (!enabled) {
+        ui.stack(id).size(width, height).content([&] {
+            ui.rect(id + ".disabled.track")
+                .position(0.0f, height * 0.30f).size(width, height * 0.16f)
+                .color(kSurfaceRaised).radius(height * 0.08f).build();
+            text(ui, id + ".disabled.text", "Raise unavailable", width, height,
+                 13.0f, kMuted, eui::HorizontalAlign::Center);
+        }).build();
+        return;
+    }
+
+    const int minimum = decision.minRaise;
+    const int maximum = decision.maxRaise;
+    state.raiseAmount = std::clamp(state.raiseAmount, minimum, maximum);
+
+    const float value = raiseSliderValue(state.raiseAmount, minimum, maximum);
+    const float trackHeight = std::max(
+        3.0f, height * action_layout::kRaiseSliderTrackHeightRatio);
+    const float trackY = height * 0.20f;
+    const float knobSize = std::max(
+        14.0f, height * action_layout::kRaiseSliderKnobHeightRatio);
+    const bool adjustable = maximum > minimum;
+
+    ui.stack(id)
+        .size(width, height)
+        .sliderState(id, value, width, knobSize,
+            [minimum, maximum](float nextValue) {
+                requestFirstRaiseInteractionFullPaint();
+                state.raiseAmount = raiseAmountFromSlider(nextValue, minimum, maximum);
+            })
+        .content([&] {
+            ui.rect(id + ".track")
+                .position(0.0f, trackY).size(width, trackHeight)
+                .color(kSurfaceRaised).radius(trackHeight * 0.5f).build();
+            ui.rect(id + ".fill")
+                .position(0.0f, trackY).size(width * value, trackHeight)
+                .color(kGold).radius(trackHeight * 0.5f)
+                .sliderFillFrom(id).build();
+            ui.rect(id + ".knob")
+                .position(0.0f, trackY + (trackHeight - knobSize) * 0.5f)
+                .size(knobSize, knobSize).color(kText).radius(knobSize * 0.5f)
+                .shadow(10.0f, 0.0f, 3.0f, {0.82f, 0.60f, 0.17f, 0.24f})
+                .sliderKnobFrom(id).build();
+
+            const float labelY = height * 0.52f;
+            const float labelHeight = height * 0.45f;
+            ui.text(id + ".minimum").position(0.0f, labelY)
+                .size(width * 0.25f, labelHeight)
+                .text(std::to_string(minimum)).fontSize(12.0f).lineHeight(16.0f)
+                .color(kMuted).verticalAlign(eui::VerticalAlign::Center).build();
+            ui.text(id + ".current").position(width * 0.25f, labelY)
+                .size(width * 0.50f, labelHeight)
+                .text(std::to_string(state.raiseAmount)).fontSize(15.0f).lineHeight(19.0f)
+                .color(kGold).horizontalAlign(eui::HorizontalAlign::Center)
+                .verticalAlign(eui::VerticalAlign::Center).build();
+            ui.text(id + ".maximum").position(width * 0.75f, labelY)
+                .size(width * 0.25f, labelHeight)
+                .text(std::to_string(maximum)).fontSize(12.0f).lineHeight(16.0f)
+                .color(kMuted).horizontalAlign(eui::HorizontalAlign::Right)
+                .verticalAlign(eui::VerticalAlign::Center).build();
+
+            if (adjustable) {
+                ui.rect(id + ".hit")
+                    .size(width, height).color({0.0f, 0.0f, 0.0f, 0.0f})
+                    .zIndex(10).interactive().sliderInputFrom(id)
+                    .onScroll([minimum, maximum](const core::ScrollEvent& event) {
+                        if (std::fabs(event.y) <= 0.001) return;
+                        requestFirstRaiseInteractionFullPaint();
+                        const int range = maximum - minimum;
+                        const int wheelStep = std::max(
+                            1, (range + action_layout::kRaiseWheelStepsPerRange - 1)
+                                / action_layout::kRaiseWheelStepsPerRange);
+                        const int notches = std::clamp(
+                            static_cast<int>(std::lround(std::fabs(event.y))),
+                            1, action_layout::kRaiseWheelMaxNotches);
+                        const int direction = event.y > 0.0 ? 1 : -1;
+                        state.raiseAmount = std::clamp(
+                            state.raiseAmount + direction * wheelStep * notches,
+                            minimum, maximum);
+                    }).build();
             }
         }).build();
 }
@@ -640,15 +871,11 @@ void humanActions(eui::Ui& ui, const ControllerView& view, float width) {
                 .radius(6.0f).colors(kGreen, kGreenHover, kGreenPressed)
                 .disabled(!canCall)
                 .onClick([] { controller.submitHumanAction({CALL, 0}); }).build();
-            components::stepper(ui, "game.action.raise.amount")
-                .size(raiseControlWidth, 42.0f).value(state.raiseAmount)
-                .min(canRaise ? decision.minRaise : 0)
-                .max(canRaise ? decision.maxRaise : 0)
-                .onChange([](long long value) { state.raiseAmount = static_cast<int>(value); })
-                .build();
+            composeRaiseSlider(ui, decision, canRaise, raiseControlWidth);
             components::button(ui, "game.action.raise")
                 .size(145.0f, 44.0f)
-                .text(state.raiseAmount == decision.maxRaise ? "All-in" : "Raise")
+                .text(state.raiseAmount == decision.maxRaise
+                    ? "All-in" : "Raise " + std::to_string(state.raiseAmount))
                 .radius(6.0f).colors(kGold, kGoldHover, kGoldPressed)
                 .disabled(!canRaise)
                 .onClick([] { controller.submitHumanAction({RAISE, state.raiseAmount}); }).build();
@@ -657,14 +884,12 @@ void humanActions(eui::Ui& ui, const ControllerView& view, float width) {
 
 void returnToSetup() {
     controller.returnToSetup();
-    state.resultOpen = false;
     state.botTaskPending = false;
     resizeMainWindow(kSetupWidth, kSetupHeight);
 }
 
 void nextRound() {
     if (controller.nextRound()) {
-        state.resultOpen = false;
         state.decisionPlayer = -1;
     }
 }
@@ -673,20 +898,12 @@ void roundActions(eui::Ui& ui, const ControllerView& view, float width) {
     ui.row("game.round.actions")
         .size(width, 48.0f).gap(10.0f).alignItems(eui::Align::CENTER)
         .content([&] {
-            text(ui, "game.round.done", view.table.roundSettled ? "Result ready" : "Round complete",
-                 130.0f, 44.0f, 14.0f, view.table.roundSettled ? kGreenHover : kGold);
             if (!view.table.roundSettled) {
-                components::button(ui, "game.round.settle")
-                    .size(190.0f, 44.0f).text("Show result").radius(6.0f)
-                    .colors(kGold, kGoldHover, kGoldPressed)
-                    .onClick([] {
-                        if (controller.settleRound()) state.resultOpen = true;
-                    }).build();
+                text(ui, "game.round.done", "Settling result...", 220.0f, 44.0f,
+                     14.0f, kGold);
             } else {
-                components::button(ui, "game.round.review")
-                    .size(180.0f, 44.0f).text("Review result").radius(6.0f)
-                    .colors(kGold, kGoldHover, kGoldPressed)
-                    .onClick([] { state.resultOpen = true; }).build();
+                text(ui, "game.round.done", "Result shown on table", 220.0f, 44.0f,
+                     14.0f, kGreenHover);
                 components::button(ui, "game.round.next")
                     .size(180.0f, 44.0f).text("Next round").radius(6.0f)
                     .colors(kGreen, kGreenHover, kGreenPressed)
@@ -696,106 +913,6 @@ void roundActions(eui::Ui& ui, const ControllerView& view, float width) {
                 .size(170.0f, 44.0f).text("Table setup").radius(6.0f)
                 .theme(components::theme::dark(), false)
                 .onClick(returnToSetup).build();
-        }).build();
-}
-
-std::string awardsText(const ControllerView& view, const PotResult& pot) {
-    std::string result;
-    for (const PlayerAward& award : pot.awards) {
-        if (!result.empty()) result += "   ";
-        if (award.playerIndex >= 0
-            && award.playerIndex < static_cast<int>(view.table.players.size())) {
-            result += view.table.players[static_cast<size_t>(award.playerIndex)].name;
-        } else {
-            result += "Player " + std::to_string(award.playerIndex + 1);
-        }
-        result += "  +" + std::to_string(award.amount);
-    }
-    return result.empty() ? "No award" : result;
-}
-
-void composeResult(eui::Ui& ui, const eui::Screen& screen, const ControllerView& view) {
-    if (!state.resultOpen || !view.roundResult.settled) return;
-
-    const float panelWidth = 590.0f;
-    const float potRows = static_cast<float>(std::max<size_t>(1, view.roundResult.pots.size()));
-    const float panelHeight = std::min(610.0f, 330.0f + potRows * 46.0f);
-    const float innerWidth = panelWidth - 48.0f;
-    const float panelX = std::max(0.0f, (screen.width - panelWidth) * 0.5f);
-    const float panelY = std::max(0.0f, (screen.height - panelHeight) * 0.5f);
-
-    ui.stack("result.overlay")
-        .size(screen.width, screen.height)
-        .zIndex(900)
-        .content([&] {
-            ui.rect("result.scrim").size(screen.width, screen.height)
-                .color({0.0f, 0.0f, 0.0f, 0.76f}).interactive().build();
-            ui.stack("result.panel")
-                .position(panelX, panelY).size(panelWidth, panelHeight)
-                .content([&] {
-                    ui.rect("result.panel.bg").size(panelWidth, panelHeight)
-                        .color(kSurface).radius(12.0f).border(1.0f, kGold)
-                        .shadow(32.0f, 0.0f, 10.0f, {0.0f, 0.0f, 0.0f, 0.50f}).build();
-                    ui.column("result.content")
-                        .size(panelWidth, panelHeight).padding(24.0f).gap(10.0f)
-                        .content([&] {
-                            text(ui, "result.title", "Round result", innerWidth, 38.0f, 26.0f, kGold);
-                            text(ui, "result.subtitle", "Pots have been awarded", innerWidth,
-                                 24.0f, 14.0f, kMuted);
-                            ui.rect("result.divider.top").size(innerWidth, 1.0f).color(kBorder).build();
-
-                            for (size_t i = 0; i < view.roundResult.pots.size(); ++i) {
-                                const PotResult& pot = view.roundResult.pots[i];
-                                const std::string id = "result.pot." + std::to_string(i);
-                                const std::string potName = i == 0
-                                    ? "Main pot  " : "Side pot " + std::to_string(i) + "  ";
-                                ui.stack(id).size(innerWidth, 40.0f).content([&] {
-                                    ui.rect(id + ".bg").size(innerWidth, 40.0f)
-                                        .color(kSurfaceRaised).radius(6.0f).build();
-                                    ui.text(id + ".label").position(10.0f, 0.0f)
-                                        .size(150.0f, 40.0f)
-                                        .text(potName + std::to_string(pot.amount))
-                                        .fontSize(14.0f).lineHeight(18.0f).color(kMuted)
-                                        .verticalAlign(eui::VerticalAlign::Center).build();
-                                    ui.text(id + ".awards").position(160.0f, 0.0f)
-                                        .size(innerWidth - 170.0f, 40.0f)
-                                        .text(awardsText(view, pot)).fontSize(15.0f).lineHeight(19.0f)
-                                        .color(kText).horizontalAlign(eui::HorizontalAlign::Right)
-                                        .verticalAlign(eui::VerticalAlign::Center).build();
-                                }).build();
-                            }
-
-                            std::string showdown;
-                            for (const PlayerSnapshot& player : view.table.players) {
-                                if (player.handDescription.empty()) continue;
-                                if (!showdown.empty()) showdown += "    |    ";
-                                showdown += player.name + ": " + player.handDescription;
-                            }
-                            ui.text("result.hands").size(innerWidth, 64.0f)
-                                .text(showdown.empty() ? "Round ended without a showdown." : showdown)
-                                .fontSize(13.0f).lineHeight(18.0f).wrap(true).color(kMuted).build();
-                            if (view.roundResult.humanToppedUp)
-                                text(ui, "result.topup", "Your stack was topped up for the next round.",
-                                     innerWidth, 24.0f, 13.0f, kGreenHover);
-                            ui.rect("result.divider.bottom").size(innerWidth, 1.0f).color(kBorder).build();
-                            ui.row("result.actions")
-                                .size(innerWidth, 44.0f).gap(10.0f)
-                                .content([&] {
-                                    components::button(ui, "result.next")
-                                        .size(180.0f, 42.0f).text("Next round").radius(6.0f)
-                                        .colors(kGreen, kGreenHover, kGreenPressed)
-                                        .onClick(nextRound).build();
-                                    components::button(ui, "result.setup")
-                                        .size(170.0f, 42.0f).text("Table setup").radius(6.0f)
-                                        .theme(components::theme::dark(), false)
-                                        .onClick(returnToSetup).build();
-                                    components::button(ui, "result.close")
-                                        .size(170.0f, 42.0f).text("Close").radius(6.0f)
-                                        .theme(components::theme::dark(), false)
-                                        .onClick([] { state.resultOpen = false; }).build();
-                                }).build();
-                        }).build();
-                }).build();
         }).build();
 }
 
@@ -865,7 +982,6 @@ void composeGame(eui::Ui& ui, const eui::Screen& screen, const ControllerView& v
                 }).build();
         }).build();
 
-    composeResult(ui, screen, view);
     scheduleBot(view);
 }
 
@@ -915,7 +1031,10 @@ const DslAppConfig& dslAppConfig() {
 }
 
 void compose(eui::Ui& ui, const eui::Screen& screen) {
-    const ControllerView view = controller.view();
+    ControllerView view = controller.view();
+    settleEndedRoundIfNeeded(view);
+    view = controller.view();
+    requestFullPaintForViewTransition(view);
     if (view.hasGame) composeGame(ui, screen, view);
     else composeSetup(ui, screen);
     composeError(ui, screen, view);
