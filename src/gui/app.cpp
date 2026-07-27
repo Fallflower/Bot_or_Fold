@@ -874,7 +874,7 @@ void composeCommunity(eui::Ui& ui, const TableSnapshot& table,
 
 void composeChipFlight(eui::Ui& ui, const PlayerSnapshot& player,
                        float seatX, float seatY, float seatWidth, float seatHeight,
-                       float potX, float potY) {
+                       float potRightX, float potCenterY) {
     const bool flying = player.index >= 0
         && player.index < static_cast<int>(state.chipFlightAmounts.size())
         && state.chipFlightAmounts[static_cast<size_t>(player.index)] > 0;
@@ -890,8 +890,11 @@ void composeChipFlight(eui::Ui& ui, const PlayerSnapshot& player,
         + seatHeight * (table_layout::kPlayerCommittedYRatio
             + table_layout::kPlayerCommittedHeightRatio * 0.5f)
         - tokenHeight * 0.5f;
-    const float targetX = flying ? potX - tokenWidth * 0.5f : startX;
-    const float targetY = flying ? potY - tokenHeight * 0.5f : startY;
+    // 增量提示停在 Pot 徽章右侧，避免覆盖徽章内原有的底池文字。
+    // 间距跟随提示框宽度缩放，在不同窗口尺寸下保持相近的视觉比例。
+    const float potTokenGap = std::clamp(tokenWidth * 0.18f, 6.0f, 10.0f);
+    const float targetX = flying ? potRightX + potTokenGap : startX;
+    const float targetY = flying ? potCenterY - tokenHeight * 0.5f : startY;
     const core::Transition flightTransition = core::Transition::make(
             flying ? motion::kChipFlightDuration : 0.0f,
             core::Ease::InOutCubic)
@@ -977,7 +980,9 @@ void composeTableStage(eui::Ui& ui, const ControllerView& view,
                 - communityCardHeight * table_layout::kCommunityVerticalOffsetRatio;
             const float potBadgeHeight = communityCardHeight
                 * table_layout::kPotBadgeHeightRatio;
-            const float potCenterX = width * 0.5f;
+            const float potBadgeWidth = communityCardWidth
+                * table_layout::kPotBadgeWidthRatio;
+            const float potRightX = width * 0.5f + potBadgeWidth * 0.5f;
             const float potCenterY = communityCardsY + communityCardHeight
                 + communityCardHeight * table_layout::kPotBadgeGapRatio
                 + potBadgeHeight * 0.5f;
@@ -1040,7 +1045,7 @@ void composeTableStage(eui::Ui& ui, const ControllerView& view,
                                 && player.active && !player.human,
                             seatX, seatY, seatWidth, seatHeight);
                 composeChipFlight(ui, player, seatX, seatY, seatWidth, seatHeight,
-                                  potCenterX, potCenterY);
+                                  potRightX, potCenterY);
             }
         }).build();
 }
