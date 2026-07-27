@@ -157,6 +157,19 @@ constexpr int kRaiseWheelMaxNotches = 5;
 
 } // namespace action_layout
 
+namespace motion {
+
+constexpr float kCardDuration = 0.34f;
+constexpr float kCardStagger = 0.055f;
+constexpr float kCardLiftRatio = 0.085f;
+constexpr float kCardFlipRadians = 1.42f;
+constexpr float kCardPerspectiveRatio = 6.0f;
+constexpr float kSeatHighlightDuration = 0.24f;
+constexpr float kChipFlightDuration = 0.40f;
+constexpr float kThinkingDuration = 0.22f;
+
+} // namespace motion
+
 struct UiState {
     std::string playerName = "Player";
     int playerCount = 6;
@@ -177,6 +190,11 @@ struct UiState {
     ControllerState paintedControllerState = ControllerState::Setup;
     int paintedActivePlayer = -2;
     int paintedStreet = -2;
+    // 动画状态只记录相邻快照的差异；Runtime 负责在两次 compose 之间插值。
+    bool animationSnapshotInitialized = false;
+    bool animationObservedSettledRound = false;
+    std::vector<int> animationCommitted;
+    std::vector<int> chipFlightAmounts;
 };
 
 GameController controller;
@@ -271,21 +289,53 @@ std::string cardSource(const CardSnapshot& card) {
 }
 
 void composeCard(eui::Ui& ui, const std::string& id, const CardSnapshot* card,
-                 float x, float y, float width, float height, bool faceDownWhenMissing = false) {
-    if (!card && !faceDownWhenMissing) {
-        ui.rect(id + ".empty")
-            .position(x, y).size(width, height)
-            .color({0.02f, 0.16f, 0.09f, 0.54f})
-            .radius(5.0f).border(1.0f, {0.42f, 0.62f, 0.50f, 0.65f})
-            .build();
-        return;
-    }
+                 float x, float y, float width, float height,
+                 bool faceDownWhenMissing = false, bool suppressed = false,
+                 float transitionDelay = 0.0f) {
+    const bool hasCard = card != nullptr;
+    const bool hasFaceData = hasCard && card->visible
+        && card->rank >= 0 && card->suit >= 0;
+    const bool faceVisible = !suppressed && hasFaceData;
+    const bool backVisible = !suppressed
+        && ((hasCard && !faceVisible) || (!hasCard && faceDownWhenMissing));
+    const bool placeholderVisible = !suppressed && !hasCard && !faceDownWhenMissing;
+    const float lift = height * motion::kCardLiftRatio;
+    const float perspective = std::max(240.0f, width * motion::kCardPerspectiveRatio);
+    const core::Transition cardTransition = core::Transition::make(
+            motion::kCardDuration, core::Ease::OutCubic)
+        .delay(transitionDelay)
+        .animate(core::AnimProperty::Opacity | core::AnimProperty::Transform);
 
-    ui.image(id)
+    // 容器及三层子元素始终使用稳定 ID。占位牌、牌背和牌面只改变
+    // opacity/transform，Runtime 因而可以跨 compose 正确完成发牌和翻牌。
+    ui.stack(id)
         .position(x, y).size(width, height)
-        .source(card ? cardSource(*card) : "assets/pokers/back.png")
-        .contain().radius(5.0f)
-        .build();
+        .content([&] {
+            ui.rect(id + ".placeholder")
+                .size(width, height)
+                .color({0.02f, 0.16f, 0.09f, 0.54f})
+                .radius(5.0f).border(1.0f, {0.42f, 0.62f, 0.50f, 0.65f})
+                .opacity(placeholderVisible ? 1.0f : 0.0f)
+                .transition(cardTransition).build();
+
+            ui.image(id + ".back")
+                .size(width, height).source("assets/pokers/back.png")
+                .contain().radius(5.0f)
+                .opacity(backVisible ? 1.0f : 0.0f)
+                .rotateY(faceVisible ? motion::kCardFlipRadians : 0.0f)
+                .perspective(perspective).transformOrigin(0.5f, 0.5f)
+                .transition(cardTransition).build();
+
+            ui.image(id + ".face")
+                .size(width, height)
+                .source(hasFaceData ? cardSource(*card) : "assets/pokers/back.png")
+                .contain().radius(5.0f)
+                .opacity(faceVisible ? 1.0f : 0.0f)
+                .translateY(faceVisible ? 0.0f : -lift)
+                .rotateY(faceVisible ? 0.0f : -motion::kCardFlipRadians)
+                .perspective(perspective).transformOrigin(0.5f, 0.5f)
+                .transition(cardTransition).build();
+        }).build();
 }
 
 void syncRaiseAmount(const ControllerView& view) {
@@ -325,6 +375,39 @@ void requestFirstRaiseInteractionFullPaint() {
     if (!state.raiseInteractionNeedsFullPaint) return;
     state.raiseInteractionNeedsFullPaint = false;
     app::detail::requestFullPaint();
+}
+
+void updateAnimationSnapshot(const ControllerView& view) {
+    if (!view.hasGame) {
+        state.animationSnapshotInitialized = false;
+        state.animationCommitted.clear();
+        state.chipFlightAmounts.clear();
+        return;
+    }
+
+    const size_t playerCount = view.table.players.size();
+    const bool newRound = state.animationSnapshotInitialized
+        && state.animationObservedSettledRound && !view.table.roundSettled;
+    const bool reset = !state.animationSnapshotInitialized
+        || state.animationCommitted.size() != playerCount || newRound;
+
+    if (reset) {
+        state.animationCommitted.resize(playerCount);
+        state.chipFlightAmounts.assign(playerCount, 0);
+        for (size_t i = 0; i < playerCount; ++i)
+            state.animationCommitted[i] = view.table.players[i].committed;
+        state.animationSnapshotInitialized = true;
+    } else {
+        if (state.chipFlightAmounts.size() != playerCount)
+            state.chipFlightAmounts.assign(playerCount, 0);
+        for (size_t i = 0; i < playerCount; ++i) {
+            const int committed = view.table.players[i].committed;
+            if (committed > state.animationCommitted[i])
+                state.chipFlightAmounts[i] = committed - state.animationCommitted[i];
+            state.animationCommitted[i] = committed;
+        }
+    }
+    state.animationObservedSettledRound = view.table.roundSettled;
 }
 
 void scheduleBot(const ControllerView& view) {
@@ -486,7 +569,7 @@ void composeSetup(eui::Ui& ui, const eui::Screen& screen) {
 }
 
 void composeSeat(eui::Ui& ui, const PlayerSnapshot& player, bool dealer,
-                 bool winner, bool showCards,
+                 bool winner, bool showCards, bool botThinking,
                  float x, float y, float width, float height) {
     const std::string id = "game.seat." + std::to_string(player.index);
     eui::Color background = player.human
@@ -505,6 +588,9 @@ void composeSeat(eui::Ui& ui, const PlayerSnapshot& player, bool dealer,
                         winner ? eui::Color{0.76f, 0.25f, 0.27f, 0.42f}
                                : (player.active ? eui::Color{0.85f, 0.62f, 0.14f, 0.34f}
                                                   : eui::Color{0.0f, 0.0f, 0.0f, 0.24f}))
+                .transition(motion::kSeatHighlightDuration, core::Ease::OutCubic)
+                .animate(core::AnimProperty::Color | core::AnimProperty::Border
+                         | core::AnimProperty::Shadow)
                 .build();
 
             const float cardWidth = std::min(
@@ -517,15 +603,16 @@ void composeSeat(eui::Ui& ui, const PlayerSnapshot& player, bool dealer,
             const float cardStep = cardWidth * table_layout::kHoleCardStepRatio;
             const CardSnapshot* first = player.cards.empty() ? nullptr : &player.cards[0];
             const CardSnapshot* second = player.cards.size() < 2 ? nullptr : &player.cards[1];
-            // Folded players hide both face-down backs and hole cards during play.
-            // Once the round is settled, showCards is true and every player's
-            // revealed cards are rendered at full opacity.
-            if (showCards || !player.folded) {
-                composeCard(ui, id + ".card.0", first, cardX, cardY,
-                            cardWidth, cardHeight, true);
-                composeCard(ui, id + ".card.1", second, cardX + cardStep, cardY,
-                            cardWidth, cardHeight, true);
-            }
+            // Fold 后保留稳定卡牌容器但隐藏所有层；摊牌时牌面层会从该
+            // 隐藏状态翻转出现。ID 采用 seat.<n>.cards.<n> 的固定层级。
+            const bool suppressCards = player.folded && !showCards;
+            composeCard(ui, id + ".cards.0", first, cardX, cardY,
+                        cardWidth, cardHeight, true, suppressCards,
+                        static_cast<float>(player.index) * 0.018f);
+            composeCard(ui, id + ".cards.1", second, cardX + cardStep, cardY,
+                        cardWidth, cardHeight, true, suppressCards,
+                        static_cast<float>(player.index) * 0.018f
+                            + motion::kCardStagger);
 
             const float infoX = width * table_layout::kPlayerInfoXRatio;
             const float infoWidth = width * table_layout::kPlayerInfoWidthRatio;
@@ -560,8 +647,22 @@ void composeSeat(eui::Ui& ui, const PlayerSnapshot& player, bool dealer,
                 .text("Stack  " + std::to_string(player.chips))
                 .fontSize(detailFont)
                 .lineHeight(detailFont + table_layout::kPlayerFontLineHeightExtra)
-                .color(kMuted)
+                .color(player.active ? kGold : kMuted)
+                .transition(motion::kSeatHighlightDuration, core::Ease::OutCubic)
+                .animate(core::AnimProperty::TextColor)
                 .verticalAlign(eui::VerticalAlign::Center).build();
+            ui.rect(id + ".committed.bg").position(
+                    infoX, height * table_layout::kPlayerCommittedYRatio)
+                .size(infoWidth, height * table_layout::kPlayerCommittedHeightRatio)
+                .color(player.active
+                    ? eui::Color{0.36f, 0.25f, 0.055f, 0.72f}
+                    : eui::Color{0.055f, 0.085f, 0.068f, 0.48f})
+                .radius(4.0f)
+                .border(player.active ? 1.0f : 0.0f,
+                        player.active ? kGold : eui::Color{0.0f, 0.0f, 0.0f, 0.0f})
+                .transition(motion::kSeatHighlightDuration, core::Ease::OutCubic)
+                .animate(core::AnimProperty::Color | core::AnimProperty::Border)
+                .build();
             ui.text(id + ".committed").position(
                     infoX, height * table_layout::kPlayerCommittedYRatio)
                 .size(infoWidth, height * table_layout::kPlayerCommittedHeightRatio)
@@ -588,6 +689,44 @@ void composeSeat(eui::Ui& ui, const PlayerSnapshot& player, bool dealer,
                 .color(!showCards && player.folded ? kRedHover : kText)
                 .horizontalAlign(eui::HorizontalAlign::Center)
                 .verticalAlign(eui::VerticalAlign::Center).build();
+
+            // Bot 思考提示始终保留三个稳定的 dot 元素；进入思考状态时
+            // 依次淡入并上移，退出时反向淡出，不需要自建循环或计时器。
+            const float thinkingWidth = std::min(64.0f, width * 0.25f);
+            const float thinkingHeight = std::max(12.0f, height * 0.085f);
+            const float dotSize = std::max(3.0f, thinkingHeight * 0.34f);
+            const float dotGap = dotSize * 0.72f;
+            const float dotsWidth = dotSize * 3.0f + dotGap * 2.0f;
+            const float dotsX = (thinkingWidth - dotsWidth) * 0.5f;
+            ui.stack(id + ".thinking")
+                .position(width * 0.5f - thinkingWidth * 0.5f,
+                          -thinkingHeight * 0.82f)
+                .size(thinkingWidth, thinkingHeight)
+                .opacity(botThinking ? 1.0f : 0.0f)
+                .translateY(botThinking ? 0.0f : 4.0f)
+                .transition(motion::kThinkingDuration, core::Ease::OutCubic)
+                .animate(core::AnimProperty::Opacity | core::AnimProperty::Transform)
+                .content([&] {
+                    ui.rect(id + ".thinking.bg")
+                        .size(thinkingWidth, thinkingHeight)
+                        .color({0.035f, 0.055f, 0.045f, 0.92f})
+                        .radius(thinkingHeight * 0.5f).border(1.0f, kGold).build();
+                    for (int dot = 0; dot < 3; ++dot) {
+                        const core::Transition dotTransition = core::Transition::make(
+                                motion::kThinkingDuration, core::Ease::OutBack)
+                            .delay(static_cast<float>(dot) * 0.055f)
+                            .animate(core::AnimProperty::Opacity
+                                     | core::AnimProperty::Transform);
+                        ui.rect(id + ".thinking.dot." + std::to_string(dot))
+                            .position(dotsX + static_cast<float>(dot) * (dotSize + dotGap),
+                                      (thinkingHeight - dotSize) * 0.5f)
+                            .size(dotSize, dotSize).color(kGold)
+                            .radius(dotSize * 0.5f)
+                            .opacity(botThinking ? 0.55f + 0.20f * dot : 0.0f)
+                            .translateY(botThinking ? 0.0f : dotSize * 0.7f)
+                            .transition(dotTransition).build();
+                    }
+                }).build();
 
             if (dealer) {
                 const float dealerSize = width * table_layout::kDealerSizeRatio;
@@ -625,9 +764,10 @@ void composeCommunity(eui::Ui& ui, const TableSnapshot& table,
         const CardSnapshot* card = i < static_cast<int>(table.publicCards.size())
             && table.publicCards[static_cast<size_t>(i)].visible
             ? &table.publicCards[static_cast<size_t>(i)] : nullptr;
-        composeCard(ui, "game.board.card." + std::to_string(i), card,
+        composeCard(ui, "game.board.cards." + std::to_string(i), card,
                     cardsX + static_cast<float>(i) * (cardWidth + cardGap), cardsY,
-                    cardWidth, cardHeight);
+                    cardWidth, cardHeight, false, false,
+                    static_cast<float>(i) * motion::kCardStagger);
     }
 
     std::string potText = table.sidePots.size() > 1
@@ -653,6 +793,75 @@ void composeCommunity(eui::Ui& ui, const TableSnapshot& table,
                      ? std::clamp(cardWidth * 0.13f, 11.0f, 16.0f)
                      : std::clamp(cardWidth * 0.19f, 13.0f, 19.0f),
                  kGold, eui::HorizontalAlign::Center);
+        }).build();
+}
+
+void composeChipFlight(eui::Ui& ui, const PlayerSnapshot& player,
+                       float seatX, float seatY, float seatWidth, float seatHeight,
+                       float potX, float potY) {
+    const bool flying = player.index >= 0
+        && player.index < static_cast<int>(state.chipFlightAmounts.size())
+        && state.chipFlightAmounts[static_cast<size_t>(player.index)] > 0;
+    const int amount = flying
+        ? state.chipFlightAmounts[static_cast<size_t>(player.index)] : 0;
+    const float tokenWidth = std::clamp(seatWidth * 0.17f, 32.0f, 52.0f);
+    const float tokenHeight = std::clamp(seatHeight * 0.12f, 15.0f, 22.0f);
+    const float startX = seatX
+        + seatWidth * (table_layout::kPlayerInfoXRatio
+            + table_layout::kPlayerInfoWidthRatio * 0.5f)
+        - tokenWidth * 0.5f;
+    const float startY = seatY
+        + seatHeight * (table_layout::kPlayerCommittedYRatio
+            + table_layout::kPlayerCommittedHeightRatio * 0.5f)
+        - tokenHeight * 0.5f;
+    const float targetX = flying ? potX - tokenWidth * 0.5f : startX;
+    const float targetY = flying ? potY - tokenHeight * 0.5f : startY;
+    const core::Transition flightTransition = core::Transition::make(
+            flying ? motion::kChipFlightDuration : 0.0f,
+            core::Ease::InOutCubic)
+        .animate(core::AnimProperty::Frame | core::AnimProperty::Opacity
+                 | core::AnimProperty::Transform);
+    const std::string id = "game.seat." + std::to_string(player.index)
+        + ".chips.flight";
+
+    // 平时筹码标记以透明状态停在玩家投入区域；检测到 committed 增量后，
+    // 同一个稳定元素移动到 Pot。下一次 compose 会在不可见状态瞬时复位。
+    auto flightStack = ui.stack(id);
+    flightStack
+        .position(targetX, targetY).size(tokenWidth, tokenHeight)
+        .opacity(flying ? 0.96f : 0.0f)
+        .scale(flying ? 0.78f : 1.0f)
+        .transformOrigin(0.5f, 0.5f).zIndex(30)
+        .transition(flightTransition)
+        .animate(core::AnimProperty::Frame | core::AnimProperty::Opacity
+                 | core::AnimProperty::Transform);
+    if (flying) {
+        flightStack.onTimer(
+            motion::kChipFlightDuration + 0.06f,
+            [playerIndex = player.index, amount] {
+                if (playerIndex < 0
+                    || playerIndex >= static_cast<int>(state.chipFlightAmounts.size())
+                    || state.chipFlightAmounts[static_cast<size_t>(playerIndex)] != amount) {
+                    return;
+                }
+                state.chipFlightAmounts[static_cast<size_t>(playerIndex)] = 0;
+                app::requestUpdate();
+            });
+    }
+    flightStack.content([&] {
+            ui.rect(id + ".bg")
+                .size(tokenWidth, tokenHeight).color(kGold)
+                .radius(tokenHeight * 0.5f)
+                .border(1.0f, {0.98f, 0.88f, 0.56f, 0.92f})
+                .shadow(10.0f, 0.0f, 2.0f, {0.0f, 0.0f, 0.0f, 0.34f})
+                .build();
+            ui.text(id + ".text")
+                .size(tokenWidth, tokenHeight)
+                .text("+" + std::to_string(amount))
+                .fontSize(std::clamp(tokenHeight * 0.54f, 9.0f, 12.0f))
+                .lineHeight(tokenHeight * 0.72f).color(kBackground)
+                .horizontalAlign(eui::HorizontalAlign::Center)
+                .verticalAlign(eui::VerticalAlign::Center).build();
         }).build();
 }
 
@@ -683,6 +892,19 @@ void composeTableStage(eui::Ui& ui, const ControllerView& view,
             composeCommunity(ui, view.table, view.roundResult, view.table.players,
                              width, height);
 
+            const float communityCardWidth = std::min(
+                width * table_layout::kCommunityCardWidthRatio,
+                height * table_layout::kCommunityCardHeightLimitRatio);
+            const float communityCardHeight = communityCardWidth
+                * table_layout::kCardHeightToWidth;
+            const float communityCardsY = height * 0.5f
+                - communityCardHeight * table_layout::kCommunityVerticalOffsetRatio;
+            const float potBadgeHeight = communityCardHeight
+                * table_layout::kPotBadgeHeightRatio;
+            const float potCenterX = width * 0.5f;
+            const float potCenterY = communityCardsY + communityCardHeight
+                + communityCardHeight * table_layout::kPotBadgeGapRatio
+                + potBadgeHeight * 0.5f;
             const int count = static_cast<int>(view.table.players.size());
             const float seatWidth = std::clamp(
                 width * (count >= table_layout::kCrowdedPlayerCount
@@ -738,7 +960,11 @@ void composeTableStage(eui::Ui& ui, const ControllerView& view,
                 composeSeat(ui, player, player.index == view.table.dealerIndex,
                             isRoundWinner(view.roundResult, player.index),
                             view.table.roundSettled,
+                            view.state == ControllerState::BotThinking
+                                && player.active && !player.human,
                             seatX, seatY, seatWidth, seatHeight);
+                composeChipFlight(ui, player, seatX, seatY, seatWidth, seatHeight,
+                                  potCenterX, potCenterY);
             }
         }).build();
 }
@@ -1086,6 +1312,7 @@ void compose(eui::Ui& ui, const eui::Screen& screen) {
     ControllerView view = controller.view();
     settleEndedRoundIfNeeded(view);
     view = controller.view();
+    updateAnimationSnapshot(view);
     requestFullPaintForViewTransition(view);
     if (view.hasGame) composeGame(ui, screen, view);
     else composeSetup(ui, screen);
