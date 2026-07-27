@@ -59,10 +59,6 @@ endif()
 if(HOLDEM_BUILD_GUI)
     add_subdirectory(external/EUI-NEO)
 
-    if(MINGW AND TARGET harfbuzz)
-        target_compile_options(harfbuzz PRIVATE -Wa,-mbig-obj)
-    endif()
-
     add_executable(holdem_gui
         external/EUI-NEO/core/app/glfw_app_main.cpp
         src/gui/app.cpp
