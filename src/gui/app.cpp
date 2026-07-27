@@ -53,7 +53,7 @@ constexpr float kShellMinHeight = 360.0f;
 constexpr float kShellPadding = 14.0f;
 constexpr float kHeaderHeight = 44.0f;
 constexpr float kSectionGap = 8.0f;
-constexpr float kFooterHeight = 48.0f;
+constexpr float kFooterHeight = 56.0f;
 
 // 绿色椭圆桌面相对于可用牌桌区域的尺寸和起点。
 constexpr float kTableXRatio = 0.115f;
@@ -141,10 +141,17 @@ constexpr float kPotBadgeGapRatio = 0.10f;
 namespace action_layout {
 
 // Raise 滑动条调节参数。
-constexpr float kRaiseSliderHeight = 42.0f;
-constexpr float kRaiseSliderTrackHeightRatio = 0.16f;
-constexpr float kRaiseSliderKnobHeightRatio = 0.55f;
-// 每次滚轮滚动约改变可加注区间的 1%，同时保证至少改变 1 筹码。
+constexpr float kRaiseSliderHeight = 54.0f;
+constexpr float kRaiseSliderTrackHeightRatio = 0.14f;
+constexpr float kRaiseSliderKnobHeightRatio = 0.40f;
+// 滑动条位置到筹码数量采用幂函数，左侧提供更细的 1 筹码级调节，
+// 右侧随位置上升而明显加快。数值越大，前段越精细、后段越陡峭。
+constexpr float kRaiseCurveExponent = 2.25f;
+// 非线性提示阶梯与滑轨等宽；每一级高度也使用上面的幂函数计算。
+constexpr int kRaiseGuideSteps = 12;
+constexpr float kRaiseGuideHeightRatio = 0.22f;
+constexpr float kRaiseGuideGap = 1.5f;
+// 每次滚轮移动约 1% 的滑动条位置；映射到筹码后始终至少变化 1。
 constexpr int kRaiseWheelStepsPerRange = 100;
 constexpr int kRaiseWheelMaxNotches = 5;
 
@@ -567,12 +574,18 @@ void composeSeat(eui::Ui& ui, const PlayerSnapshot& player, bool dealer,
                     infoX, height * table_layout::kPlayerActionYRatio)
                 .size(infoWidth, height * table_layout::kPlayerActionHeightRatio)
                 .color({0.035f, 0.065f, 0.052f, 0.88f}).radius(6.0f).build();
+            // 牌局进行中，这个文本框显示玩家最近一次操作；
+            // round 结算后复用同一个区域显示 handType 的牌型描述。
+            const std::string bottomText = showCards
+                ? (player.handDescription.empty()
+                    ? "No hand information" : player.handDescription)
+                : actionLabel(player);
             ui.text(id + ".action").position(
                     infoX, height * table_layout::kPlayerActionYRatio)
                 .size(infoWidth, height * table_layout::kPlayerActionHeightRatio)
-                .text(actionLabel(player)).fontSize(detailFont)
+                .text(bottomText).fontSize(detailFont)
                 .lineHeight(detailFont + table_layout::kPlayerFontLineHeightExtra)
-                .color(player.folded ? kRedHover : kText)
+                .color(!showCards && player.folded ? kRedHover : kText)
                 .horizontalAlign(eui::HorizontalAlign::Center)
                 .verticalAlign(eui::VerticalAlign::Center).build();
 
@@ -617,10 +630,14 @@ void composeCommunity(eui::Ui& ui, const TableSnapshot& table,
                     cardWidth, cardHeight);
     }
 
-    const std::string potText = table.sidePots.size() > 1
+    std::string potText = table.sidePots.size() > 1
         ? "Total pot  " + std::to_string(table.pot) + "  |  "
             + std::to_string(table.sidePots.size()) + " pots"
         : "Pot  " + std::to_string(table.pot);
+    // 结算态复用原 Pot 徽章展示获奖玩家及其分配到的筹码，
+    // 不再在公共牌下方额外创建结果框。
+    if (result.settled)
+        potText += "  ->  " + roundWinnersText(result, players);
     const float badgeWidth = cardWidth * table_layout::kPotBadgeWidthRatio;
     const float badgeHeight = cardHeight * table_layout::kPotBadgeHeightRatio;
     ui.stack("game.pot.badge")
@@ -632,31 +649,11 @@ void composeCommunity(eui::Ui& ui, const TableSnapshot& table,
                 .color({0.025f, 0.11f, 0.065f, 0.92f}).radius(badgeHeight * 0.5f)
                 .border(1.0f, kGold).build();
             text(ui, "game.pot.badge.text", potText, badgeWidth, badgeHeight,
-                 std::clamp(cardWidth * 0.19f, 13.0f, 19.0f),
+                 result.settled
+                     ? std::clamp(cardWidth * 0.13f, 11.0f, 16.0f)
+                     : std::clamp(cardWidth * 0.19f, 13.0f, 19.0f),
                  kGold, eui::HorizontalAlign::Center);
         }).build();
-
-    if (result.settled) {
-        const float resultWidth = badgeWidth * 2.30f;
-        const float resultHeight = badgeHeight * 1.35f;
-        const float resultY = cardsY + cardHeight + badgeHeight
-            + cardHeight * 0.24f;
-        ui.stack("game.round.result")
-            .position(stageWidth * 0.5f - resultWidth * 0.5f, resultY)
-            .size(resultWidth, resultHeight)
-            .content([&] {
-                ui.rect("game.round.result.bg")
-                    .size(resultWidth, resultHeight)
-                    .color({0.12f, 0.035f, 0.04f, 0.90f})
-                    .radius(resultHeight * 0.25f)
-                    .border(1.0f, kRedHover).build();
-                text(ui, "game.round.result.text",
-                     "Winner  " + roundWinnersText(result, players),
-                     resultWidth, resultHeight,
-                     std::clamp(cardWidth * 0.18f, 13.0f, 18.0f),
-                     kText, eui::HorizontalAlign::Center);
-            }).build();
-    }
 }
 
 void composeTableStage(eui::Ui& ui, const ControllerView& view,
@@ -750,14 +747,37 @@ int raiseAmountFromSlider(float value, int minimum, int maximum) {
     if (maximum <= minimum) return minimum;
     const float normalized = std::clamp(value, 0.0f, 1.0f);
     return minimum + static_cast<int>(std::lround(
-        normalized * static_cast<float>(maximum - minimum)));
+        std::pow(normalized, action_layout::kRaiseCurveExponent)
+            * static_cast<float>(maximum - minimum)));
 }
 
 float raiseSliderValue(int amount, int minimum, int maximum) {
     if (maximum <= minimum) return 1.0f;
-    return std::clamp(
+    const float normalized = std::clamp(
         static_cast<float>(amount - minimum) / static_cast<float>(maximum - minimum),
         0.0f, 1.0f);
+    return std::clamp(
+        std::pow(normalized, 1.0f / action_layout::kRaiseCurveExponent),
+        0.0f, 1.0f);
+}
+
+int raiseAmountFromWheel(int amount, int minimum, int maximum,
+                         int direction, int notches) {
+    int adjusted = std::clamp(amount, minimum, maximum);
+    const float positionStep = 1.0f
+        / static_cast<float>(action_layout::kRaiseWheelStepsPerRange);
+    for (int notch = 0; notch < notches; ++notch) {
+        const float currentPosition = raiseSliderValue(adjusted, minimum, maximum);
+        const float nextPosition = std::clamp(
+            currentPosition + static_cast<float>(direction) * positionStep,
+            0.0f, 1.0f);
+        const int mapped = raiseAmountFromSlider(nextPosition, minimum, maximum);
+        if (direction > 0)
+            adjusted = std::min(maximum, std::max(adjusted + 1, mapped));
+        else
+            adjusted = std::max(minimum, std::min(adjusted - 1, mapped));
+    }
+    return adjusted;
 }
 
 void composeRaiseSlider(eui::Ui& ui, const DecisionRequest& decision,
@@ -783,7 +803,7 @@ void composeRaiseSlider(eui::Ui& ui, const DecisionRequest& decision,
     const float value = raiseSliderValue(state.raiseAmount, minimum, maximum);
     const float trackHeight = std::max(
         3.0f, height * action_layout::kRaiseSliderTrackHeightRatio);
-    const float trackY = height * 0.20f;
+    const float trackY = height * 0.38f;
     const float knobSize = std::max(
         14.0f, height * action_layout::kRaiseSliderKnobHeightRatio);
     const bool adjustable = maximum > minimum;
@@ -796,6 +816,41 @@ void composeRaiseSlider(eui::Ui& ui, const DecisionRequest& decision,
                 state.raiseAmount = raiseAmountFromSlider(nextValue, minimum, maximum);
             })
         .content([&] {
+            // 非线性映射提示：阶梯和滑轨完全等宽。每一级高度使用与数值
+            // 映射相同的幂函数，因此左侧缓慢、右侧陡峭；颜色同步由浅至深。
+            // 该图形仅作视觉说明，不参与交互命中测试。
+            const float guideHeight = height * action_layout::kRaiseGuideHeightRatio;
+            const float guideY = 1.0f;
+            const float totalGap = action_layout::kRaiseGuideGap
+                * static_cast<float>(action_layout::kRaiseGuideSteps - 1);
+            const float stepWidth = std::max(
+                1.0f,
+                (width - totalGap)
+                    / static_cast<float>(action_layout::kRaiseGuideSteps));
+            const eui::Color lightGold{0.98f, 0.88f, 0.58f, 0.34f};
+            const eui::Color deepAmber{0.58f, 0.29f, 0.035f, 0.92f};
+            for (int step = 0; step < action_layout::kRaiseGuideSteps; ++step) {
+                const float progress = static_cast<float>(step + 1)
+                    / static_cast<float>(action_layout::kRaiseGuideSteps);
+                const float curved = std::pow(
+                    progress, action_layout::kRaiseCurveExponent);
+                const float stepHeight = 1.5f
+                    + (guideHeight - 1.5f) * curved;
+                const float shade = std::pow(progress, 1.20f);
+                const eui::Color stepColor{
+                    lightGold.r + (deepAmber.r - lightGold.r) * shade,
+                    lightGold.g + (deepAmber.g - lightGold.g) * shade,
+                    lightGold.b + (deepAmber.b - lightGold.b) * shade,
+                    lightGold.a + (deepAmber.a - lightGold.a) * shade,
+                };
+                const float stepX = static_cast<float>(step)
+                    * (stepWidth + action_layout::kRaiseGuideGap);
+                ui.rect(id + ".curve.step." + std::to_string(step))
+                    .position(stepX, guideY + guideHeight - stepHeight)
+                    .size(stepWidth, stepHeight)
+                    .color(stepColor).radius(std::min(2.0f, stepWidth * 0.20f))
+                    .build();
+            }
             ui.rect(id + ".track")
                 .position(0.0f, trackY).size(width, trackHeight)
                 .color(kSurfaceRaised).radius(trackHeight * 0.5f).build();
@@ -833,17 +888,12 @@ void composeRaiseSlider(eui::Ui& ui, const DecisionRequest& decision,
                     .onScroll([minimum, maximum](const core::ScrollEvent& event) {
                         if (std::fabs(event.y) <= 0.001) return;
                         requestFirstRaiseInteractionFullPaint();
-                        const int range = maximum - minimum;
-                        const int wheelStep = std::max(
-                            1, (range + action_layout::kRaiseWheelStepsPerRange - 1)
-                                / action_layout::kRaiseWheelStepsPerRange);
                         const int notches = std::clamp(
                             static_cast<int>(std::lround(std::fabs(event.y))),
                             1, action_layout::kRaiseWheelMaxNotches);
                         const int direction = event.y > 0.0 ? 1 : -1;
-                        state.raiseAmount = std::clamp(
-                            state.raiseAmount + direction * wheelStep * notches,
-                            minimum, maximum);
+                        state.raiseAmount = raiseAmountFromWheel(
+                            state.raiseAmount, minimum, maximum, direction, notches);
                     }).build();
             }
         }).build();
@@ -854,10 +904,12 @@ void humanActions(eui::Ui& ui, const ControllerView& view, float width) {
     const bool canFold = hasAction(decision, FOLD);
     const bool canCall = hasAction(decision, CALL);
     const bool canRaise = hasAction(decision, RAISE);
-    const float raiseControlWidth = std::max(180.0f, width - 570.0f);
+    // 缩短 Raise 控件，避免在宽屏下吞掉整行操作区；剩余空间由行布局留白。
+    const float raiseControlWidth = std::clamp(width * 0.22f, 230.0f, 380.0f);
 
     ui.row("game.actions")
-        .size(width, 48.0f).gap(10.0f).alignItems(eui::Align::CENTER)
+        .size(width, 56.0f).gap(10.0f)
+        .alignItems(eui::Align::CENTER).justifyContent(eui::Align::CENTER)
         .content([&] {
             text(ui, "game.action.prompt", "Your action", 100.0f, 44.0f, 14.0f, kGold);
             components::button(ui, "game.action.fold")
