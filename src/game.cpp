@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <thread>
 #include <random>
-#include <sstream>
 #include <type_traits>
 #include "ranker_data.h"
 #include "ranker_data_short.h"
@@ -672,11 +671,8 @@ TableSnapshot Game<NumT>::snapshot() const {
         playerView.hasLastAction = playerView.lastAction.id >= 0;
 
         const bool revealCards = i == hpi || isEnd();
-        if (revealCards) {
-            std::ostringstream handDescription;
-            handDescription << HandType<NumT>::evaluate(getHands(i));
-            playerView.handDescription = handDescription.str();
-        }
+        if (revealCards)
+            playerView.handType = HandType<NumT>::evaluate(getHands(i)).displayData();
         for (const auto& card : hands[i]) {
             CardSnapshot cardView;
             cardView.visible = revealCards;

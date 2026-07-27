@@ -14,6 +14,17 @@ enum HANDRANK {
     STRAIGHT_FLUSH  // 同花顺
 };
 
+// 与自然语言无关的牌型展示数据。前端根据 rank 和 definingRanks
+// 自行选择语言与排版；kickerRank 独立保存，避免解析 to_string()。
+struct HandTypeDisplayData {
+    HANDRANK rank = HIGH_CARD;
+    std::vector<int> definingRanks;
+    int kickerRank = -1;
+    bool royalFlush = false;
+
+    bool hasKicker() const { return kickerRank >= 0; }
+};
+
 template<typename NumT = CARDNUM>
 struct HandType
 {
@@ -21,6 +32,7 @@ struct HandType
     std::vector<NumT> keys;
 
     std::string to_string() const;
+    HandTypeDisplayData displayData() const;
     static HandType evaluate(const std::vector<Card<NumT>>& cards);
     static int compareHandType(const HandType& t1, const HandType& t2);
 };

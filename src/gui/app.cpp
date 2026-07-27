@@ -250,6 +250,67 @@ std::string actionLabel(const PlayerSnapshot& player) {
     return label;
 }
 
+struct SeatBottomText {
+    std::string primary;
+    std::string secondary;
+};
+
+std::string displayRank(int rank) {
+    static const char* ranks[] = {
+        "2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"
+    };
+    return rank >= 0 && rank < static_cast<int>(sizeof(ranks) / sizeof(ranks[0]))
+        ? ranks[rank] : "?";
+}
+
+SeatBottomText seatBottomText(const PlayerSnapshot& player, bool showCards) {
+    if (!showCards) return {actionLabel(player), {}};
+    if (!player.handType.has_value()) return {"Hand unavailable", {}};
+
+    const HandTypeDisplayData& hand = *player.handType;
+    const auto definingRank = [&](size_t index) {
+        return index < hand.definingRanks.size()
+            ? displayRank(hand.definingRanks[index]) : std::string("?");
+    };
+
+    SeatBottomText text;
+    switch (hand.rank) {
+    case HIGH_CARD:
+        text.primary = "High: " + definingRank(0);
+        break;
+    case ONE_PAIR:
+        text.primary = "Pair: " + definingRank(0);
+        break;
+    case TWO_PAIR:
+        text.primary = "Two Pair: " + definingRank(0) + " " + definingRank(1);
+        break;
+    case THREE_OF_A_KIND:
+        text.primary = "Trips: " + definingRank(0);
+        break;
+    case STRAIGHT:
+        text.primary = "Straight: " + definingRank(0) + "-high";
+        break;
+    case FLUSH:
+        text.primary = "Flush: " + definingRank(0) + "-high";
+        break;
+    case FULL_HOUSE:
+        text.primary = "Full House: " + definingRank(0)
+            + " over " + definingRank(1);
+        break;
+    case FOUR_OF_A_KIND:
+        text.primary = "Quads: " + definingRank(0);
+        break;
+    case STRAIGHT_FLUSH:
+        text.primary = hand.royalFlush
+            ? "Royal Flush"
+            : "Straight Flush: " + definingRank(0) + "-high";
+        break;
+    }
+    if (hand.hasKicker())
+        text.secondary = "Kicker: " + displayRank(hand.kickerRank);
+    return text;
+}
+
 bool isRoundWinner(const RoundResult& result, int playerIndex) {
     for (const PotResult& pot : result.pots) {
         if (std::find(pot.winners.begin(), pot.winners.end(), playerIndex)
@@ -676,17 +737,32 @@ void composeSeat(eui::Ui& ui, const PlayerSnapshot& player, bool dealer,
                 .size(infoWidth, height * table_layout::kPlayerActionHeightRatio)
                 .color({0.035f, 0.065f, 0.052f, 0.88f}).radius(6.0f).build();
             // 牌局进行中，这个文本框显示玩家最近一次操作；
-            // round 结算后复用同一个区域显示 handType 的牌型描述。
-            const std::string bottomText = showCards
-                ? (player.handDescription.empty()
-                    ? "No hand information" : player.handDescription)
-                : actionLabel(player);
+            // round 结算后复用同一个区域显示牌型，kicker 独占第二行。
+            const SeatBottomText bottomText = seatBottomText(player, showCards);
+            const bool hasSecondaryLine = !bottomText.secondary.empty();
+            const float actionY = height * table_layout::kPlayerActionYRatio;
+            const float actionHeight = height * table_layout::kPlayerActionHeightRatio;
+            const float primaryY = actionY
+                + (hasSecondaryLine ? actionHeight * 0.03f : 0.0f);
+            const float primaryHeight = actionHeight
+                * (hasSecondaryLine ? 0.50f : 1.0f);
+            const float primaryFont = hasSecondaryLine
+                ? std::max(10.0f, detailFont * 0.90f) : detailFont;
             ui.text(id + ".action").position(
-                    infoX, height * table_layout::kPlayerActionYRatio)
-                .size(infoWidth, height * table_layout::kPlayerActionHeightRatio)
-                .text(bottomText).fontSize(detailFont)
-                .lineHeight(detailFont + table_layout::kPlayerFontLineHeightExtra)
+                    infoX, primaryY)
+                .size(infoWidth, primaryHeight)
+                .text(bottomText.primary).fontSize(primaryFont)
+                .lineHeight(primaryFont + 1.0f)
                 .color(!showCards && player.folded ? kRedHover : kText)
+                .horizontalAlign(eui::HorizontalAlign::Center)
+                .verticalAlign(eui::VerticalAlign::Center).build();
+            const float secondaryFont = std::max(9.0f, detailFont * 0.78f);
+            ui.text(id + ".action.kicker").position(
+                    infoX, actionY + actionHeight * 0.49f)
+                .size(infoWidth, actionHeight * 0.48f)
+                .text(bottomText.secondary).fontSize(secondaryFont)
+                .lineHeight(secondaryFont + 1.0f)
+                .color(kMuted).opacity(hasSecondaryLine ? 1.0f : 0.0f)
                 .horizontalAlign(eui::HorizontalAlign::Center)
                 .verticalAlign(eui::VerticalAlign::Center).build();
 

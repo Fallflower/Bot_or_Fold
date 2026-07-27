@@ -3,6 +3,25 @@
 #include <cassert>
 
 int main() {
+    const HandTypeDisplayData pairDisplay = HandType<CARDNUM>{
+        ONE_PAIR, {CARDNUM::QUEEN, CARDNUM::ACE}
+    }.displayData();
+    assert(pairDisplay.rank == ONE_PAIR);
+    assert(pairDisplay.definingRanks.size() == 1);
+    assert(pairDisplay.definingRanks[0] == static_cast<int>(CARDNUM::QUEEN));
+    assert(pairDisplay.kickerRank == static_cast<int>(CARDNUM::ACE));
+
+    const HandTypeDisplayData fullHouseDisplay = HandType<CARDNUM>{
+        FULL_HOUSE, {CARDNUM::KING, CARDNUM::NUM_7}
+    }.displayData();
+    assert(fullHouseDisplay.definingRanks.size() == 2);
+    assert(!fullHouseDisplay.hasKicker());
+
+    const HandTypeDisplayData royalFlushDisplay = HandType<CARDNUM>{
+        STRAIGHT_FLUSH, {CARDNUM::ACE}
+    }.displayData();
+    assert(royalFlushDisplay.royalFlush);
+
     Position position(2, 1);
     Game<CARDNUM> game(position, 200, HumanPlayer<CARDNUM>("Human", 200), 0);
 
@@ -11,10 +30,11 @@ int main() {
     assert(initial.publicCards.size() == 5);
     assert(initial.players[0].human);
     assert(initial.players[0].cards[0].visible);
-    assert(!initial.players[0].handDescription.empty());
+    assert(initial.players[0].handType.has_value());
+    assert(!initial.players[0].handType->definingRanks.empty());
     assert(!initial.players[1].cards[0].visible);
     assert(initial.players[1].cards[0].rank == -1);
-    assert(initial.players[1].handDescription.empty());
+    assert(!initial.players[1].handType.has_value());
 
     const DecisionRequest firstDecision = game.decisionRequest();
     assert(firstDecision.playerIndex == 0);
@@ -38,7 +58,7 @@ int main() {
     const TableSnapshot showdown = game.snapshot();
     assert(showdown.roundEnded);
     assert(showdown.players[1].cards[0].visible);
-    assert(!showdown.players[1].handDescription.empty());
+    assert(showdown.players[1].handType.has_value());
 
     const RoundResult firstSettlement = game.settleRound();
     const TableSnapshot settled = game.snapshot();

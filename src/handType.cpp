@@ -68,6 +68,52 @@ std::string HandType<NumT>::to_string() const {
 }
 
 template<typename NumT>
+HandTypeDisplayData HandType<NumT>::displayData() const {
+    HandTypeDisplayData data;
+    data.rank = rank;
+
+    const auto addDefiningRank = [&](size_t index) {
+        if (index < keys.size())
+            data.definingRanks.push_back(static_cast<int>(keys[index]));
+    };
+    const auto setKicker = [&](size_t index) {
+        if (index < keys.size())
+            data.kickerRank = static_cast<int>(keys[index]);
+    };
+
+    switch (rank) {
+    case HIGH_CARD:
+        addDefiningRank(0);
+        break;
+    case ONE_PAIR:
+    case THREE_OF_A_KIND:
+    case FOUR_OF_A_KIND:
+        addDefiningRank(0);
+        setKicker(1);
+        break;
+    case TWO_PAIR:
+        addDefiningRank(0);
+        addDefiningRank(1);
+        setKicker(2);
+        break;
+    case STRAIGHT:
+    case FLUSH:
+        addDefiningRank(0);
+        break;
+    case FULL_HOUSE:
+        addDefiningRank(0);
+        addDefiningRank(1);
+        break;
+    case STRAIGHT_FLUSH:
+        addDefiningRank(0);
+        data.royalFlush = !keys.empty()
+            && keys[0] == static_cast<NumT>(NumT::ACE);
+        break;
+    }
+    return data;
+}
+
+template<typename NumT>
 HandType<NumT> HandType<NumT>::evaluate(const std::vector<Card<NumT>>& cards) { //支持2-7张牌的评估
     std::map<SUIT, int> suit_statistic = {
         {SUIT::HEA, 0},

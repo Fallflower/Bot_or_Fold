@@ -2,6 +2,7 @@
 #define HOLDEM_GAME_STATE_H
 
 #include "player.h"
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -37,7 +38,7 @@ struct PlayerSnapshot {
     bool active = false;
     bool human = false;
     bool hasLastAction = false;
-    std::string handDescription;
+    std::optional<HandTypeDisplayData> handType;
     actInfo lastAction;
     std::vector<CardSnapshot> cards;
 };
