@@ -32,5 +32,7 @@ Android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
 The Android target builds the real Holdem setup page, game core, and table GUI. The
-setup page uses portrait orientation; starting a game switches to landscape, and
-returning to table setup restores portrait orientation.
+setup page uses a fixed portrait orientation; starting a game switches to a fixed
+landscape orientation, and returning to table setup restores portrait orientation.
+The activity also closes the soft keyboard before changing orientation so the IME
+and SDL surface do not compete to resize the drawable during the transition.
