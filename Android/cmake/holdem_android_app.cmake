@@ -14,10 +14,6 @@ if(NOT DEFINED EUI_ANDROID_SDL2_DIR OR NOT EXISTS "${EUI_ANDROID_SDL2_DIR}/CMake
     message(FATAL_ERROR "EUI_ANDROID_SDL2_DIR must point to an SDL2 source directory.")
 endif()
 
-if(NOT DEFINED HOLDEM_ANDROID_APP_SOURCE)
-    set(HOLDEM_ANDROID_APP_SOURCE "${HOLDEM_ROOT}/Android/app/src/main/cpp/android_app.cpp")
-endif()
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -35,15 +31,25 @@ set(EUI_DEPS_MODE auto CACHE STRING "Use predeclared SDL2 and bundled EUI depend
 set(EUI_BUILD_APPS OFF CACHE BOOL "Do not build EUI desktop examples" FORCE)
 set(EUI_BUILD_USER_APPS OFF CACHE BOOL "Do not scan EUI desktop apps" FORCE)
 set(EUI_ENABLE_INSTALL OFF CACHE BOOL "Disable EUI install rules on Android" FORCE)
-set(EUI_ENABLE_MODULES OFF CACHE BOOL "Keep the Android foundation minimal" FORCE)
+set(EUI_ENABLE_MODULES OFF CACHE BOOL "Keep the Android game build minimal" FORCE)
 
 add_subdirectory("${EUI_NEO_ROOT}" "${CMAKE_BINARY_DIR}/eui-neo" EXCLUDE_FROM_ALL)
 
+set(HOLDEM_BUILD_CLI OFF CACHE BOOL "Do not build the desktop CLI for Android" FORCE)
+set(HOLDEM_BUILD_GUI OFF CACHE BOOL "The Android target owns the GUI entry point" FORCE)
+set(BUILD_TESTING OFF CACHE BOOL "Do not build desktop tests for Android" FORCE)
+add_subdirectory("${HOLDEM_ROOT}" "${CMAKE_BINARY_DIR}/holdem" EXCLUDE_FROM_ALL)
+set_target_properties(holdem_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 add_library(main SHARED
     "${EUI_NEO_ROOT}/core/app/sdl2_app_main.cpp"
-    "${HOLDEM_ANDROID_APP_SOURCE}"
+    "${HOLDEM_ROOT}/src/gui/app.cpp"
+    "${HOLDEM_ROOT}/src/gui/presentation.cpp"
 )
 
-target_include_directories(main PRIVATE "${EUI_NEO_ROOT}")
-target_link_libraries(main PRIVATE eui::neo SDL2::SDL2)
+target_include_directories(main PRIVATE
+    "${EUI_NEO_ROOT}"
+    "${HOLDEM_ROOT}/include"
+)
+target_link_libraries(main PRIVATE holdem_core eui::neo SDL2::SDL2)
 eui_neo_configure_app(main)

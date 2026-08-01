@@ -1,4 +1,4 @@
-name: Android foundation
+name: Android game APK
 
 on:
   workflow_dispatch:
@@ -7,9 +7,12 @@ on:
       - "Android/**"
       - "assets/**"
       - "resources/**"
+      - "include/**"
+      - "src/**"
       - "external/EUI-NEO"
+      - "CMakeLists.txt"
       - ".gitmodules"
-      - ".github/workflows/android-foundation.yml"
+      - ".github/workflows/android-game.yml"
 
 permissions:
   contents: read
@@ -51,15 +54,15 @@ jobs:
           path: Android/.deps
           key: holdem-android-sdl2-2.32.10
 
-      - name: Build foundation APK
+      - name: Build game APK
         shell: bash
         run: |
           chmod +x external/EUI-NEO/Android/gradlew
           external/EUI-NEO/Android/gradlew -p Android :app:assembleDebug
 
-      - name: Upload foundation APK
+      - name: Upload game APK
         uses: actions/upload-artifact@v6
         with:
-          name: bot-or-fold-android-foundation
+          name: bot-or-fold-android-game
           path: Android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

@@ -103,16 +103,14 @@ android {
         minSdk 26
         targetSdk 36
         versionCode 1
-        versionName "0.1.0-android-foundation"
+        versionName "0.1.0-android-stage-b"
 
         externalNativeBuild {
             cmake {
                 arguments(
                         "-DEUI_ANDROID_SDL2_DIR=${sdl2Dir.absolutePath.replace("\\", "/")}",
                         "-DEUI_NEO_ROOT=${euiRoot.absolutePath.replace("\\", "/")}",
-                        "-DHOLDEM_ROOT=${holdemRoot.absolutePath.replace("\\", "/")}",
-                        "-DHOLDEM_ANDROID_APP_SOURCE=${file("src/main/cpp/android_app.cpp").absolutePath.replace("\\", "/")}"                
-                )
+                        "-DHOLDEM_ROOT=${holdemRoot.absolutePath.replace("\\", "/")}")
             }
         }
 

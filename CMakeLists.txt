@@ -59,15 +59,21 @@ endif()
 if(HOLDEM_BUILD_GUI)
     add_subdirectory(external/EUI-NEO)
 
+    if(EUI_WINDOW_BACKEND STREQUAL "sdl2")
+        set(HOLDEM_EUI_APP_MAIN external/EUI-NEO/core/app/sdl2_app_main.cpp)
+    elseif(EUI_WINDOW_BACKEND STREQUAL "glfw")
+        set(HOLDEM_EUI_APP_MAIN external/EUI-NEO/core/app/glfw_app_main.cpp)
+    else()
+        message(FATAL_ERROR "Unsupported EUI window backend: ${EUI_WINDOW_BACKEND}")
+    endif()
+
     add_executable(holdem_gui
-        external/EUI-NEO/core/app/glfw_app_main.cpp
+        ${HOLDEM_EUI_APP_MAIN}
         src/gui/app.cpp
+        src/gui/presentation.cpp
     )
     target_link_libraries(holdem_gui PRIVATE holdem_core)
     eui_neo_configure_app(holdem_gui)
-    eui_neo_copy_app_assets(holdem_gui
-        "${CMAKE_CURRENT_SOURCE_DIR}/external/EUI-NEO/assets"
-    )
     eui_neo_copy_app_assets(holdem_gui
         "${CMAKE_CURRENT_SOURCE_DIR}/assets"
     )

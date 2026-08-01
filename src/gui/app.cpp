@@ -1,8 +1,7 @@
 #include "eui_neo.h"
 #include "gameController.h"
+#include "guiPresentation.h"
 #include "position.h"
-
-#include <GLFW/glfw3.h>
 
 #include <algorithm>
 #include <cctype>
@@ -199,11 +198,6 @@ struct UiState {
 
 GameController controller;
 UiState state;
-
-void resizeMainWindow(int width, int height) {
-    if (GLFWwindow* window = glfwGetCurrentContext())
-        glfwSetWindowSize(window, width, height);
-}
 
 void text(eui::Ui& ui, const std::string& id, const std::string& value,
           float width, float height, float fontSize,
@@ -621,7 +615,10 @@ void composeSetup(eui::Ui& ui, const eui::Screen& screen) {
                                         ? GameMode::Standard : GameMode::ShortDeck;
                                     if (controller.startGame(config)) {
                                         state.decisionPlayer = -1;
-                                        resizeMainWindow(kTableWidth, kTableHeight);
+                                         holdem::gui::requestPresentation(
+                                             holdem::gui::Presentation::Game,
+                                             kTableWidth,
+                                             kTableHeight);
                                     }
                                 }).build();
                         }).build();
@@ -1244,7 +1241,10 @@ void humanActions(eui::Ui& ui, const ControllerView& view, float width) {
 void returnToSetup() {
     controller.returnToSetup();
     state.botTaskPending = false;
-    resizeMainWindow(kSetupWidth, kSetupHeight);
+    holdem::gui::requestPresentation(
+        holdem::gui::Presentation::Setup,
+        kSetupWidth,
+        kSetupHeight);
 }
 
 void nextRound() {
@@ -1383,7 +1383,7 @@ const DslAppConfig& dslAppConfig() {
         .title("Bot or Fold")
         .pageId("holdem_gui")
         .clearColor(kBackground)
-        .windowSize(kSetupWidth, kSetupHeight)
+        .windowSize(1280, 720)
         .fps(90.0)
         .showDebugStatsInTitle(false);
     return config;

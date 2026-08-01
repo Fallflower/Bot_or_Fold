@@ -31,5 +31,6 @@ The debug APK is written to:
 Android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Stage 1 deliberately builds a small foundation screen. The Holdem game GUI is connected
-in the next stage, after its direct GLFW calls are removed.
+The Android target builds the real Holdem setup page, game core, and table GUI. The
+setup page uses portrait orientation; starting a game switches to landscape, and
+returning to table setup restores portrait orientation.
