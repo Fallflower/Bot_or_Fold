@@ -35,4 +35,7 @@ The Android target builds the real Holdem setup page, game core, and table GUI. 
 setup page uses a fixed portrait orientation; starting a game switches to a fixed
 landscape orientation, and returning to table setup restores portrait orientation.
 The activity also closes the soft keyboard before changing orientation so the IME
-and SDL surface do not compete to resize the drawable during the transition.
+and SDL surface do not compete to resize the drawable during the transition. Holdem
+overrides SDL's Android orientation hook so its resizable native window cannot reset
+the activity to `fullUser`, and opts out of Android 16 forced resizability while that
+compatibility property remains supported.

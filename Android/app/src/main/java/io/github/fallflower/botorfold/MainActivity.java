@@ -10,6 +10,15 @@ import android.view.inputmethod.InputMethodManager;
 public class MainActivity extends com.sudoevolve.euineo.MainActivity {
     private volatile boolean gamePresentation = false;
 
+    @Override
+    public void setOrientationBis(int width, int height, boolean resizable, String hint) {
+        // SDL marks its single Android window as resizable and would therefore
+        // replace our page-specific orientation with SCREEN_ORIENTATION_FULL_USER.
+        // Keep this app as the sole owner of orientation instead. This also lets
+        // SDLSurface reject transient surfaces whose aspect ratio is wrong.
+        runOnUiThread(this::applyPresentationOrientation);
+    }
+
     public void requestGamePresentation(boolean game) {
         gamePresentation = game;
         runOnUiThread(() -> {
@@ -37,9 +46,7 @@ public class MainActivity extends com.sudoevolve.euineo.MainActivity {
         final int requestedOrientation = gamePresentation
                 ? ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                 : ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
-        if (getRequestedOrientation() != requestedOrientation) {
-            setRequestedOrientation(requestedOrientation);
-        }
+        setRequestedOrientation(requestedOrientation);
     }
 
     private void hideSoftKeyboard() {
