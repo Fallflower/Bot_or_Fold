@@ -1,0 +1,9 @@
+<resources>
+    <style name="BotOrFoldTheme" parent="@android:style/Theme.NoTitleBar.Fullscreen">
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentTransitions">false</item>
+        <item name="android:colorAccent">#1f9a60</item>
+    </style>
+</resources>

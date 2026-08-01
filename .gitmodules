@@ -1,3 +1,4 @@
 [submodule "external/EUI-NEO"]
 	path = external/EUI-NEO
 	url = https://github.com/sudoevolve/EUI-NEO.git
+	branch = Android

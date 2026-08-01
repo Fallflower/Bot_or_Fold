@@ -6,5 +6,10 @@ CLAUDE.md
 *.exe
 *log*.txt
 
-main
+/main
 build/
+Android/.deps/
+Android/.gradle/
+Android/app/.cxx/
+Android/app/build/
+Android/local.properties

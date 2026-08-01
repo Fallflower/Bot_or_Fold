@@ -1,0 +1,65 @@
+name: Android foundation
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "Android/**"
+      - "assets/**"
+      - "resources/**"
+      - "external/EUI-NEO"
+      - ".gitmodules"
+      - ".github/workflows/android-foundation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  debug-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out Holdem and EUI-NEO
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android toolchain
+        shell: bash
+        run: |
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;27.0.12077973" \
+            "cmake;3.22.1"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Cache SDL2 sources
+        uses: actions/cache@v4
+        with:
+          path: Android/.deps
+          key: holdem-android-sdl2-2.32.10
+
+      - name: Build foundation APK
+        shell: bash
+        run: |
+          chmod +x external/EUI-NEO/Android/gradlew
+          external/EUI-NEO/Android/gradlew -p Android :app:assembleDebug
+
+      - name: Upload foundation APK
+        uses: actions/upload-artifact@v6
+        with:
+          name: bot-or-fold-android-foundation
+          path: Android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
