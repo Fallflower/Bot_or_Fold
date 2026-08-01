@@ -16,6 +16,7 @@ def managedSdl2Dir = file("${rootDir}/.deps/SDL2-${sdl2Version}")
 def sdl2Dir = usesManagedSdl2 ? managedSdl2Dir : file(sdl2DirValue)
 def holdemRoot = file("../..")
 def euiRoot = file("../../external/EUI-NEO")
+def generatedEuiSourceDir = file("$buildDir/generated/euiNeoSource")
 def generatedFrameworkAssetsDir = file("$buildDir/generated/euiFrameworkAssets")
 def generatedGameAssetsDir = file("$buildDir/generated/holdemGameAssets")
 def generatedResourceAssetsDir = file("$buildDir/generated/holdemResourceAssets")
@@ -70,6 +71,40 @@ tasks.register("prepareSdl2") {
     }
 }
 
+tasks.register("prepareEuiNeoSource") {
+    inputs.files(fileTree(euiRoot) {
+        exclude ".git", ".git/**", "build/**", "Android/.gradle/**", "Android/app/build/**"
+    })
+    outputs.dir(generatedEuiSourceDir)
+    doLast {
+        delete(generatedEuiSourceDir)
+        copy {
+            from euiRoot
+            into generatedEuiSourceDir
+            exclude ".git", ".git/**", "build/**", "Android/.gradle/**", "Android/app/build/**"
+        }
+
+        // EUI currently sets currentTransform without rotating its projection,
+        // viewport or scissor. Use Android's compositor until EUI implements the
+        // complete Vulkan pre-rotation contract.
+        File backend = file("${generatedEuiSourceDir}/core/render/vulkan/vulkan_backend.cpp")
+        String original = "    swapchainInfo.preTransform = capabilities.currentTransform;"
+        String replacement = """#if defined(__ANDROID__)
+    swapchainInfo.preTransform =
+        (capabilities.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) != 0
+        ? VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR
+        : capabilities.currentTransform;
+#else
+    swapchainInfo.preTransform = capabilities.currentTransform;
+#endif"""
+        String source = backend.getText("UTF-8")
+        if (source.count(original) != 1) {
+            throw new GradleException("The EUI Vulkan orientation patch no longer matches ${backend}")
+        }
+        backend.setText(source.replace(original, replacement), "UTF-8")
+    }
+}
+
 tasks.register("syncFrameworkAssets", Copy) {
     dependsOn("prepareSdl2")
     from file("${euiRoot}/assets")
@@ -109,7 +144,7 @@ android {
             cmake {
                 arguments(
                         "-DEUI_ANDROID_SDL2_DIR=${sdl2Dir.absolutePath.replace("\\", "/")}",
-                        "-DEUI_NEO_ROOT=${euiRoot.absolutePath.replace("\\", "/")}",
+                        "-DEUI_NEO_ROOT=${generatedEuiSourceDir.absolutePath.replace("\\", "/")}",
                         "-DHOLDEM_ROOT=${holdemRoot.absolutePath.replace("\\", "/")}")
             }
         }
@@ -163,6 +198,7 @@ android {
 }
 
 preBuild.dependsOn(
+        "prepareEuiNeoSource",
         "syncFrameworkAssets",
         "syncGameAssets",
         "syncGameResources",
@@ -174,5 +210,5 @@ tasks.matching {
             it.name.startsWith("buildCMake") ||
             it.name.startsWith("externalNativeBuild")
 }.configureEach {
-    dependsOn("prepareSdl2")
+    dependsOn("prepareSdl2", "prepareEuiNeoSource")
 }

@@ -171,6 +171,7 @@ constexpr float kThinkingDuration = 0.22f;
 
 struct UiState {
     std::string playerName = "Player";
+    float setupScrollOffset = 0.0f;
     int playerCount = 6;
     int initialChips = 200;
     int humanPlayerIndex = 5;
@@ -496,6 +497,18 @@ void settleEndedRoundIfNeeded(const ControllerView& view) {
 
 void setupRow(eui::Ui& ui, const std::string& id, const std::string& label,
               float width, const std::function<void(float)>& composeControl) {
+    if (width < 390.0f) {
+        ui.column(id)
+            .size(width, 72.0f)
+            .gap(4.0f)
+            .content([&] {
+                text(ui, id + ".label", label, width, 24.0f, 14.0f, kMuted);
+                composeControl(width);
+            })
+            .build();
+        return;
+    }
+
     const float labelWidth = 150.0f;
     const float controlWidth = width - labelWidth - 14.0f;
     ui.row(id)
@@ -540,9 +553,8 @@ void composePositionSelector(eui::Ui& ui, float width) {
 }
 
 void composeSetup(eui::Ui& ui, const eui::Screen& screen) {
-    const float panelWidth = std::min(590.0f, std::max(430.0f, screen.width - 32.0f));
-    const float panelHeight = std::min(750.0f, std::max(650.0f, screen.height - 32.0f));
-    const float innerWidth = panelWidth - 48.0f;
+    const float panelWidth = std::max(0.0f, std::min(590.0f, screen.width - 24.0f));
+    const float panelHeight = std::max(0.0f, std::min(750.0f, screen.height - 24.0f));
     const float panelX = std::max(0.0f, (screen.width - panelWidth) * 0.5f);
     const float panelY = std::max(0.0f, (screen.height - panelHeight) * 0.5f);
 
@@ -558,68 +570,89 @@ void composeSetup(eui::Ui& ui, const eui::Screen& screen) {
                         .color(kSurface).radius(10.0f).border(1.0f, kBorder)
                         .shadow(28.0f, 0.0f, 10.0f, {0.0f, 0.0f, 0.0f, 0.34f})
                         .build();
-                    ui.column("setup.form")
+                    components::scrollView(ui, "setup.scroll")
                         .size(panelWidth, panelHeight)
-                        .padding(24.0f).gap(14.0f)
-                        .content([&] {
-                            text(ui, "setup.title", "Bot or Fold", innerWidth, 44.0f, 30.0f);
-                            text(ui, "setup.subtitle", "Create a new poker table", innerWidth,
-                                 26.0f, 14.0f, kMuted);
+                        .offset(state.setupScrollOffset)
+                        .step(52.0f)
+                        .scrollbarWidth(7.0f)
+                        .scrollbarGap(5.0f)
+                        .onChange([](float value) { state.setupScrollOffset = value; })
+                        .content([&](eui::Ui& contentUi, float contentWidth, float) {
+                            const float innerWidth = std::max(0.0f, contentWidth - 48.0f);
+                            contentUi.column("setup.form")
+                                .size(contentWidth, 750.0f)
+                                .padding(24.0f).gap(14.0f)
+                                .content([&] {
+                                    text(contentUi, "setup.title", "Bot or Fold", innerWidth,
+                                         44.0f, 30.0f);
+                                    text(contentUi, "setup.subtitle", "Create a new poker table",
+                                         innerWidth, 26.0f, 14.0f, kMuted);
 
-                            setupRow(ui, "setup.name", "Player name", innerWidth, [&](float width) {
-                                components::input(ui, "setup.name.input")
-                                    .size(width, 42.0f).value(state.playerName).placeholder("Player")
-                                    .onChange([](const std::string& value) { state.playerName = value; })
-                                    .build();
-                            });
-                            setupRow(ui, "setup.mode", "Game mode", innerWidth, [&](float width) {
-                                components::segmented(ui, "setup.mode.segmented")
-                                    .size(width, 40.0f).items({"Standard", "Short Deck"})
-                                    .selected(state.mode)
-                                    .onChange([](int value) { state.mode = value; }).build();
-                            });
-                            setupRow(ui, "setup.players", "Players", innerWidth, [&](float width) {
-                                components::stepper(ui, "setup.players.stepper")
-                                    .size(width, 40.0f).value(state.playerCount).min(2).max(9)
-                                    .onChange([](long long value) {
-                                        state.playerCount = static_cast<int>(value);
-                                        state.humanPlayerIndex = std::min(
-                                            state.humanPlayerIndex, state.playerCount - 1);
-                                    }).build();
-                            });
-                            setupRow(ui, "setup.chips", "Starting chips", innerWidth, [&](float width) {
-                                components::stepper(ui, "setup.chips.stepper")
-                                    .size(width, 40.0f).value(state.initialChips)
-                                    .step(50).min(50).max(5000)
-                                    .onChange([](long long value) {
-                                        state.initialChips = static_cast<int>(value);
-                                    }).build();
-                            });
-                            setupRow(ui, "setup.position", "Your position", innerWidth,
-                                     [&](float width) { composePositionSelector(ui, width); });
+                                    setupRow(contentUi, "setup.name", "Player name", innerWidth,
+                                             [&](float width) {
+                                        components::input(contentUi, "setup.name.input")
+                                            .size(width, 42.0f).value(state.playerName)
+                                            .placeholder("Player")
+                                            .onChange([](const std::string& value) {
+                                                state.playerName = value;
+                                            }).build();
+                                    });
+                                    setupRow(contentUi, "setup.mode", "Game mode", innerWidth,
+                                             [&](float width) {
+                                        components::segmented(contentUi, "setup.mode.segmented")
+                                            .size(width, 40.0f).items({"Standard", "Short Deck"})
+                                            .selected(state.mode)
+                                            .onChange([](int value) { state.mode = value; }).build();
+                                    });
+                                    setupRow(contentUi, "setup.players", "Players", innerWidth,
+                                             [&](float width) {
+                                        components::stepper(contentUi, "setup.players.stepper")
+                                            .size(width, 40.0f).value(state.playerCount).min(2).max(9)
+                                            .onChange([](long long value) {
+                                                state.playerCount = static_cast<int>(value);
+                                                state.humanPlayerIndex = std::min(
+                                                    state.humanPlayerIndex,
+                                                    state.playerCount - 1);
+                                            }).build();
+                                    });
+                                    setupRow(contentUi, "setup.chips", "Starting chips", innerWidth,
+                                             [&](float width) {
+                                        components::stepper(contentUi, "setup.chips.stepper")
+                                            .size(width, 40.0f).value(state.initialChips)
+                                            .step(50).min(50).max(5000)
+                                            .onChange([](long long value) {
+                                                state.initialChips = static_cast<int>(value);
+                                            }).build();
+                                    });
+                                    setupRow(contentUi, "setup.position", "Your position", innerWidth,
+                                             [&](float width) {
+                                        composePositionSelector(contentUi, width);
+                                    });
 
-                            ui.rect("setup.divider").size(innerWidth, 1.0f).color(kBorder).build();
-                            text(ui, "setup.hint",
-                                 "Your position is shown by its poker name (SB, BB, UTG, CO, D).",
-                                 innerWidth, 34.0f, 13.0f, kMuted);
-                            components::button(ui, "setup.start")
-                                .size(innerWidth, 50.0f).text("Start game").radius(7.0f)
-                                .colors(kGreen, kGreenHover, kGreenPressed)
-                                .onClick([] {
-                                    GameConfig config;
-                                    config.playerName = state.playerName;
-                                    config.playerCount = state.playerCount;
-                                    config.initialChips = state.initialChips;
-                                    config.humanPlayerIndex = state.humanPlayerIndex;
-                                    config.mode = state.mode == 0
-                                        ? GameMode::Standard : GameMode::ShortDeck;
-                                    if (controller.startGame(config)) {
-                                        state.decisionPlayer = -1;
-                                         holdem::gui::requestPresentation(
-                                             holdem::gui::Presentation::Game,
-                                             kTableWidth,
-                                             kTableHeight);
-                                    }
+                                    contentUi.rect("setup.divider")
+                                        .size(innerWidth, 1.0f).color(kBorder).build();
+                                    text(contentUi, "setup.hint",
+                                         "Your position is shown by its poker name (SB, BB, UTG, CO, D).",
+                                         innerWidth, 34.0f, 13.0f, kMuted);
+                                    components::button(contentUi, "setup.start")
+                                        .size(innerWidth, 50.0f).text("Start game").radius(7.0f)
+                                        .colors(kGreen, kGreenHover, kGreenPressed)
+                                        .onClick([] {
+                                            GameConfig config;
+                                            config.playerName = state.playerName;
+                                            config.playerCount = state.playerCount;
+                                            config.initialChips = state.initialChips;
+                                            config.humanPlayerIndex = state.humanPlayerIndex;
+                                            config.mode = state.mode == 0
+                                                ? GameMode::Standard : GameMode::ShortDeck;
+                                            if (controller.startGame(config)) {
+                                                state.decisionPlayer = -1;
+                                                holdem::gui::requestPresentation(
+                                                    holdem::gui::Presentation::Game,
+                                                    kTableWidth,
+                                                    kTableHeight);
+                                            }
+                                        }).build();
                                 }).build();
                         }).build();
                 }).build();
@@ -1276,6 +1309,20 @@ void roundActions(eui::Ui& ui, const ControllerView& view, float width) {
 }
 
 void composeGame(eui::Ui& ui, const eui::Screen& screen, const ControllerView& view) {
+    if (screen.width <= screen.height) {
+        ui.stack("game.orientation.pending")
+            .size(screen.width, screen.height)
+            .content([&] {
+                ui.rect("game.orientation.background")
+                    .size(screen.width, screen.height)
+                    .color({0.025f, 0.070f, 0.045f, 1.0f}).build();
+                text(ui, "game.orientation.brand", "Bot or Fold",
+                     screen.width, screen.height, 24.0f, kMuted,
+                     eui::HorizontalAlign::Center);
+            }).build();
+        return;
+    }
+
     syncRaiseAmount(view);
     const float shellWidth = std::max(
         table_layout::kShellMinWidth,

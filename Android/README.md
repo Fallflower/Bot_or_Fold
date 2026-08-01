@@ -37,5 +37,10 @@ landscape orientation, and returning to table setup restores portrait orientatio
 The activity also closes the soft keyboard before changing orientation so the IME
 and SDL surface do not compete to resize the drawable during the transition. Holdem
 overrides SDL's Android orientation hook so its resizable native window cannot reset
-the activity to `fullUser`, and opts out of Android 16 forced resizability while that
-compatibility property remains supported.
+the activity to `fullUser`. The manifest identifies the app as a game so Android 16
+applies its documented game exception for orientation restrictions.
+
+The Android build compiles a generated copy of EUI-NEO with compositor-managed
+Vulkan rotation. The pinned EUI backend advertises `currentTransform` without doing
+the matching projection, viewport, and scissor pre-rotation; delegating rotation to
+Android prevents the rendered surface and SDL input coordinates from diverging.
