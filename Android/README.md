@@ -44,3 +44,6 @@ The Android build compiles a generated copy of EUI-NEO with compositor-managed
 Vulkan rotation. The pinned EUI backend advertises `currentTransform` without doing
 the matching projection, viewport, and scissor pre-rotation; delegating rotation to
 Android prevents the rendered surface and SDL input coordinates from diverging.
+During a viewport change, the generated SDL loop also keeps requesting full frames
+until the drawable size is stable, allowing Vulkan swapchain recreation and the
+responsive setup form to settle without requiring a touch event.

@@ -102,6 +102,40 @@ tasks.register("prepareEuiNeoSource") {
             throw new GradleException("The EUI Vulkan orientation patch no longer matches ${backend}")
         }
         backend.setText(source.replace(original, replacement), "UTF-8")
+
+        // Android may report the new drawable size before its Vulkan surface and
+        // swapchain have settled on that size. Keep rendering a few full frames
+        // after every viewport change so the first visible frame cannot retain
+        // the transition geometry until the next touch event.
+        File sdlApp = file("${generatedEuiSourceDir}/core/app/sdl2_app_main.cpp")
+        String stateOriginal = "#ifdef __ANDROID__\n    bool surfaceResetPending = false;\n#endif"
+        String stateReplacement = "#ifdef __ANDROID__\n    bool surfaceResetPending = false;\n    int orientationSettleFrames = 0;\n    int lastDrawableWidth = 0;\n    int lastDrawableHeight = 0;\n#endif"
+        String appSource = sdlApp.getText("UTF-8").replace("\r\n", "\n")
+        if (appSource.count(stateOriginal) != 1) {
+            throw new GradleException("The EUI Android viewport state patch no longer matches ${sdlApp}")
+        }
+        appSource = appSource.replace(stateOriginal, stateReplacement)
+
+        String eventOriginal = "        case SDL_WINDOWEVENT_RESIZED:\n        case SDL_WINDOWEVENT_SIZE_CHANGED:\n        case SDL_WINDOWEVENT_SHOWN:"
+        String eventReplacement = "        case SDL_WINDOWEVENT_RESIZED:\n        case SDL_WINDOWEVENT_SIZE_CHANGED:\n#ifdef __ANDROID__\n            state.orientationSettleFrames = 6;\n#endif\n        case SDL_WINDOWEVENT_SHOWN:"
+        if (appSource.count(eventOriginal) != 1) {
+            throw new GradleException("The EUI Android resize event patch no longer matches ${sdlApp}")
+        }
+        appSource = appSource.replace(eventOriginal, eventReplacement)
+
+        String waitOriginal = "        const bool animating = state.anyAnimating(childWindows.anyAnimating());\n        if (!animating) {"
+        String waitReplacement = "        const bool animating = state.anyAnimating(childWindows.anyAnimating());\n#ifdef __ANDROID__\n        const bool orientationSettling = state.orientationSettleFrames > 0;\n#else\n        const bool orientationSettling = false;\n#endif\n        if (!animating && !orientationSettling) {"
+        if (appSource.count(waitOriginal) != 1) {
+            throw new GradleException("The EUI Android frame wait patch no longer matches ${sdlApp}")
+        }
+        appSource = appSource.replace(waitOriginal, waitReplacement)
+
+        String drawableOriginal = "        const float dpi = dpiScale(window);\n        const float pointer = pointerScale(window);"
+        String drawableReplacement = "#ifdef __ANDROID__\n        const bool drawableSizeChanged =\n            state.lastDrawableWidth != drawableWidth ||\n            state.lastDrawableHeight != drawableHeight;\n        state.lastDrawableWidth = drawableWidth;\n        state.lastDrawableHeight = drawableHeight;\n        if (drawableSizeChanged) {\n            state.orientationSettleFrames = 6;\n        }\n        if (state.orientationSettleFrames > 0) {\n            --state.orientationSettleFrames;\n            state.paintRequested = true;\n            app::detail::requestFullPaint();\n        }\n#endif\n        const float dpi = dpiScale(window);\n        const float pointer = pointerScale(window);"
+        if (appSource.count(drawableOriginal) != 1) {
+            throw new GradleException("The EUI Android drawable size patch no longer matches ${sdlApp}")
+        }
+        sdlApp.setText(appSource.replace(drawableOriginal, drawableReplacement), "UTF-8")
     }
 }
 
