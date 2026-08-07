@@ -76,6 +76,15 @@ int main() {
     assert(!nextRound.roundSettled);
     assert(!nextRound.players[1].cards[0].visible);
 
+    Game<CARDNUM> foldedGame(
+        position, 200, HumanPlayer<CARDNUM>("Human", 200), 0);
+    foldedGame.submitAction({FOLD, 0});
+    const TableSnapshot foldedShowdown = foldedGame.snapshot();
+    assert(foldedShowdown.roundEnded);
+    assert(foldedShowdown.players[0].folded);
+    assert(!foldedShowdown.players[0].cards[0].visible);
+    assert(!foldedShowdown.players[0].handType.has_value());
+
     Position botFirstPosition(2, 1);
     Game<CARDNUM> botFirstGame(
         botFirstPosition, 200, HumanPlayer<CARDNUM>("Human", 200), 1);

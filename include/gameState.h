@@ -80,6 +80,8 @@ struct RoundResult {
     bool settled = false;
     bool humanToppedUp = false;
     std::vector<PotResult> pots;
+    // Uncalled excess bets returned to their owners; these are not wins.
+    std::vector<PlayerAward> refunds;
 };
 
 #endif

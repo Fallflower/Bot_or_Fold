@@ -23,6 +23,7 @@ set(HOLDEM_CORE_SOURCES
     src/handType.cpp
     src/handType_.cpp
     src/resource_locator.cpp
+    src/pot_calculator.cpp
     src/player.cpp
     src/humanPlayer.cpp
     src/botPlayer.cpp
@@ -112,6 +113,10 @@ if(BUILD_TESTING)
     add_executable(handType_evaluate_test tests/handType_evaluate_test.cpp)
     target_link_libraries(handType_evaluate_test PRIVATE holdem_core)
     add_test(NAME handType_evaluate COMMAND handType_evaluate_test)
+
+    add_executable(pot_calculator_test tests/pot_calculator_test.cpp)
+    target_link_libraries(pot_calculator_test PRIVATE holdem_core)
+    add_test(NAME pot_calculator COMMAND pot_calculator_test)
 endif()
 
 # ============================================================================

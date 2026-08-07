@@ -1,5 +1,6 @@
 #include "game.h"
 #include "assistant.h"
+#include "pot_calculator.h"
 #include <algorithm>
 #include <thread>
 #include <random>
@@ -255,67 +256,13 @@ std::vector<int> Game<NumT>::getWinners(const std::vector<int>& eligiblePlayers)
 
 template<typename NumT>
 std::vector<SidePot> Game<NumT>::calculateSidePots() const {
-    // Copy each player's total committed chips
-    std::vector<int> remaining(playerNum);
-    for (int i = 0; i < playerNum; i++)
-        remaining[i] = getPlayerCommited(i);
-
-    // Collect all-in non-folded players, sorted by total committed ascending
-    std::vector<std::pair<int, int>> allinPlayers;  // (index, total_committed)
+    std::vector<int> contributions(static_cast<size_t>(playerNum));
+    std::vector<bool> folded(static_cast<size_t>(playerNum));
     for (int i = 0; i < playerNum; i++) {
-        if (!ftag[i] && atag[i])
-            allinPlayers.emplace_back(i, getPlayerCommited(i));
+        contributions[static_cast<size_t>(i)] = getPlayerCommited(i);
+        folded[static_cast<size_t>(i)] = ftag[i];
     }
-    std::sort(allinPlayers.begin(), allinPlayers.end(),
-              [](const auto& a, const auto& b) { return a.second < b.second; });
-
-    std::vector<SidePot> pots;
-    int prevLevel = 0;
-
-    for (const auto& [idx, level] : allinPlayers) {
-        if (level <= prevLevel) continue;
-
-        int diff = level - prevLevel;
-        int levelContrib = 0;
-
-        for (int p = 0; p < playerNum; p++) {
-            int take = std::min(remaining[p], diff);
-            remaining[p] -= take;
-            levelContrib += take;
-        }
-
-        // Eligible: non-folded players who committed at least 'level'
-        std::vector<int> eligible;
-        for (int p = 0; p < playerNum; p++) {
-            if (!ftag[p] && getPlayerCommited(p) >= level)
-                eligible.push_back(p);
-        }
-
-        pots.push_back({levelContrib, std::move(eligible)});
-        prevLevel = level;
-    }
-
-    // Final pot: remaining chips from non-all-in players
-    int finalContrib = 0;
-    for (int i = 0; i < playerNum; i++)
-        finalContrib += remaining[i];
-
-    if (finalContrib > 0) {
-        std::vector<int> eligible;
-        for (int p = 0; p < playerNum; p++) {
-            if (!ftag[p] && !atag[p])
-                eligible.push_back(p);
-        }
-        if (eligible.empty()) {  // fallback: all non-folded
-            for (int p = 0; p < playerNum; p++) {
-                if (!ftag[p])
-                    eligible.push_back(p);
-            }
-        }
-        pots.push_back({finalContrib, std::move(eligible)});
-    }
-
-    return pots;
+    return holdem::calculatePots(contributions, folded).pots;
 }
 
 template<typename NumT>
@@ -693,7 +640,8 @@ TableSnapshot Game<NumT>::snapshot() const {
         playerView.lastAction = players[i]->getLastAction();
         playerView.hasLastAction = playerView.lastAction.id >= 0;
 
-        const bool revealCards = i == hpi || isEnd();
+        const bool revealCards = (!isEnd() && i == hpi)
+            || (isEnd() && !ftag[i]);
         if (revealCards)
             playerView.handType = HandType<NumT>::evaluate(getHands(i)).displayData();
         for (const auto& card : hands[i]) {
@@ -709,6 +657,11 @@ TableSnapshot Game<NumT>::snapshot() const {
     }
 
     result.sidePots = calculateSidePots();
+    if (isEnd()) {
+        result.pot = 0;
+        for (const SidePot& sidePot : result.sidePots)
+            result.pot += sidePot.amount;
+    }
     return result;
 }
 
@@ -719,7 +672,26 @@ RoundResult Game<NumT>::settleRound() {
 
     roundResult_ = {};
     roundResult_.settled = true;
-    const auto sidePots = calculateSidePots();
+    std::vector<int> contributions(static_cast<size_t>(playerNum));
+    std::vector<bool> folded(static_cast<size_t>(playerNum));
+    for (int i = 0; i < playerNum; ++i) {
+        contributions[static_cast<size_t>(i)] = getPlayerCommited(i);
+        folded[static_cast<size_t>(i)] = ftag[i];
+    }
+    holdem::PotCalculation calculation = holdem::calculatePots(contributions, folded);
+    const auto& sidePots = calculation.pots;
+
+    for (const PlayerAward& refund : calculation.refunds) {
+        if (refund.playerIndex < 0 || refund.playerIndex >= playerNum
+            || refund.amount <= 0) continue;
+        players[refund.playerIndex]->addChips(refund.amount);
+        roundResult_.refunds.push_back(refund);
+        if (g_log) {
+            g_log->writeLine(players[refund.playerIndex]->getName()
+                + " - uncalled bet returned: "
+                + std::to_string(refund.amount) + " chips");
+        }
+    }
 
     for (size_t pi = 0; pi < sidePots.size(); pi++) {
         const auto& sidePot = sidePots[pi];

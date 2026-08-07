@@ -1071,7 +1071,7 @@ void composeTableStage(eui::Ui& ui, const ControllerView& view,
                     2.0f, height - seatHeight - 2.0f);
                 composeSeat(ui, player, player.index == view.table.dealerIndex,
                             isRoundWinner(view.roundResult, player.index),
-                            view.table.roundSettled,
+                            view.table.roundSettled && !player.folded,
                             view.state == ControllerState::BotThinking
                                 && player.active && !player.human,
                             seatX, seatY, seatWidth, seatHeight);
