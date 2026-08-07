@@ -16,6 +16,10 @@ public:
     void reset();
     void setShow(int stateCode);
     void shuffle();
+    template<typename RNG>
+    void shuffle(RNG& rng) {
+        std::shuffle(pile_.begin(), pile_.end(), rng);
+    }
     void deal(int playerNum, std::vector<std::vector<Card<NumT>>>& hands);
 
     const std::vector<Card<NumT>>& getPile() const { return pile_; }

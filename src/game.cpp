@@ -110,27 +110,52 @@ const std::vector<Card<NumT>> Game<NumT>::getFinalHands(const int& k) const {
 
 template<typename NumT>
 double Game<NumT>::calcEquity(const int& pi, const int& simulations) const {
-    std::vector<double> win(playerNum, 0.0);
-
     std::vector<Card<NumT>> knownPubCards = getKnownPubCards();
-    int left_n = 5 - knownPubCards.size();
+    int left_n = 5 - static_cast<int>(knownPubCards.size());
     Deck<NumT> simDeck(getHands(pi));   // 构造一个模拟牌堆，不含玩家pi的手牌和已知的公共牌
-    for (int i = 0; i < simulations; i++) {
-        Deck<NumT> tempDeck = simDeck;  // 复制构造的牌堆
-        tempDeck.shuffle();
-        std::vector<std::vector<Card<NumT>>> simHands;
-        tempDeck.deal(playerNum - 1, simHands); // 发牌给除玩家pi之外的其他玩家(pn-1人)
-        std::vector<Card<NumT>> pub_cards(knownPubCards.begin(), knownPubCards.end());
-        if (left_n > 0) {   // 拼接已知的公共牌和随机发的公共牌
-            const auto remain_pub = tempDeck.getFrontN(left_n);
-            pub_cards.insert(pub_cards.end(), remain_pub.begin(), remain_pub.end());
-        }
-        simHands.insert(simHands.begin() + pi, hands[pi]); // 将玩家pi的手牌插入模拟手牌正确的位置
-        auto winners = checkWinner(simHands, pub_cards);
-        double share = 1.0 / winners.size();
-        for (auto j : winners)
-            win[j] += share;
+
+    int num_threads = std::thread::hardware_concurrency();
+    if (num_threads == 0) num_threads = 4;  // fallback on platforms where it returns 0 (e.g. some Android NDK)
+    if (num_threads > simulations) num_threads = simulations;
+    if (num_threads <= 0) num_threads = 1;
+
+    int per_thread = simulations / num_threads;
+
+    std::vector<std::vector<double>> local_win(num_threads, std::vector<double>(playerNum, 0.0));
+    std::vector<std::thread> threads;
+
+    for (int t = 0; t < num_threads; t++) {
+        threads.emplace_back([&, t]() {
+            std::mt19937 rng(std::random_device{}());
+            int start = t * per_thread;
+            int end = (t == num_threads - 1) ? simulations : start + per_thread;
+
+            for (int i = start; i < end; i++) {
+                Deck<NumT> tempDeck = simDeck;  // 复制构造的牌堆
+                tempDeck.shuffle(rng);
+                std::vector<std::vector<Card<NumT>>> simHands;
+                tempDeck.deal(playerNum - 1, simHands); // 发牌给除玩家pi之外的其他玩家(pn-1人)
+                std::vector<Card<NumT>> pub_cards(knownPubCards.begin(), knownPubCards.end());
+                if (left_n > 0) {   // 拼接已知的公共牌和随机发的公共牌
+                    const auto remain_pub = tempDeck.getFrontN(left_n);
+                    pub_cards.insert(pub_cards.end(), remain_pub.begin(), remain_pub.end());
+                }
+                simHands.insert(simHands.begin() + pi, hands[pi]); // 将玩家pi的手牌插入模拟手牌正确的位置
+                auto winners = checkWinner(simHands, pub_cards);
+                double share = 1.0 / winners.size();
+                for (auto j : winners)
+                    local_win[t][j] += share;
+            }
+        });
     }
+
+    for (auto& t : threads) t.join();
+
+    std::vector<double> win(playerNum, 0.0);
+    for (int t = 0; t < num_threads; t++)
+        for (int i = 0; i < playerNum; i++)
+            win[i] += local_win[t][i];
+
     return win[pi] * 100.0 / simulations;
 }
 
