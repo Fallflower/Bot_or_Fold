@@ -47,3 +47,9 @@ Android prevents the rendered surface and SDL input coordinates from diverging.
 During a viewport change, the generated SDL loop also keeps requesting full frames
 until the drawable size is stable, allowing Vulkan swapchain recreation and the
 responsive setup form to settle without requiring a touch event.
+
+The two hand-ranking tables remain external files. `resources/*.bin` is copied into
+the APK assets, and the activity copies the asset tree into its internal files
+directory before SDL starts. The shared resource locator then loads the same
+`resources/card5_dic_zipped.bin` or `resources/card5_dic_zipped_shortdeck.bin`
+path on Android and desktop; no generated ranker C++ source is embedded in the APK.

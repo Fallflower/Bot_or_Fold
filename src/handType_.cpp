@@ -1,7 +1,7 @@
 #include "handType_.h"
+#include "resource_locator.h"
 #include <fstream>
 #include <climits>
-#include <cstring>
 
 
 #define SUIT_0_MASK   0x1111111111111ULL
@@ -15,10 +15,9 @@ namespace {
     advancedHandType s_ranker;
 }
 
-bool initAdvancedRanker(const unsigned char* data, unsigned int size) {
-    return s_ranker.loadFromMemory(data, size);
+bool initAdvancedRanker(const std::string& resourcePath) {
+    return s_ranker.load(resourcePath);
 }
-
 
 // Compress rank bits: for each of the 13 ranks, count how many suits are present
 static uint64_t ranksHash(uint64_t cards_hash) {
@@ -39,71 +38,32 @@ static bool isFlush(uint64_t hash) {
 }
 
 bool advancedHandType::load(const std::string& bin_path) {
-    std::ifstream file(bin_path, std::ios::binary);
+    const std::filesystem::path resolved = holdem::resources::locate(bin_path);
+    std::ifstream file(resolved, std::ios::binary);
     if (!file) return false;
 
+    loaded = false;
     flush_map.clear();
     other_map.clear();
 
     int cnt, val;
     uint64_t key;
 
-    file.read(reinterpret_cast<char*>(&cnt), sizeof(cnt));
+    if (!file.read(reinterpret_cast<char*>(&cnt), sizeof(cnt)) || cnt < 0) return false;
     for (int i = 0; i < cnt; i++) {
-        file.read(reinterpret_cast<char*>(&key), sizeof(key));
-        file.read(reinterpret_cast<char*>(&val), sizeof(val));
+        if (!file.read(reinterpret_cast<char*>(&key), sizeof(key))
+            || !file.read(reinterpret_cast<char*>(&val), sizeof(val))) return false;
         flush_map[key] = val;
     }
 
-    file.read(reinterpret_cast<char*>(&cnt), sizeof(cnt));
+    if (!file.read(reinterpret_cast<char*>(&cnt), sizeof(cnt)) || cnt < 0) return false;
     for (int i = 0; i < cnt; i++) {
-        file.read(reinterpret_cast<char*>(&key), sizeof(key));
-        file.read(reinterpret_cast<char*>(&val), sizeof(val));
+        if (!file.read(reinterpret_cast<char*>(&key), sizeof(key))
+            || !file.read(reinterpret_cast<char*>(&val), sizeof(val))) return false;
         other_map[key] = val;
     }
 
     file.close();
-    loaded = true;
-    return true;
-}
-
-bool advancedHandType::loadFromMemory(const unsigned char* data, unsigned int size) {
-    flush_map.clear();
-    other_map.clear();
-
-    unsigned int offset = 0;
-
-    // Read flush_map count
-    int cnt, val;
-    uint64_t key;
-
-    if (offset + sizeof(cnt) > size) return false;
-    std::memcpy(&cnt, data + offset, sizeof(cnt));
-    offset += sizeof(cnt);
-
-    for (int i = 0; i < cnt; i++) {
-        if (offset + sizeof(key) + sizeof(val) > size) return false;
-        std::memcpy(&key, data + offset, sizeof(key));
-        offset += sizeof(key);
-        std::memcpy(&val, data + offset, sizeof(val));
-        offset += sizeof(val);
-        flush_map[key] = val;
-    }
-
-    // Read other_map count
-    if (offset + sizeof(cnt) > size) return false;
-    std::memcpy(&cnt, data + offset, sizeof(cnt));
-    offset += sizeof(cnt);
-
-    for (int i = 0; i < cnt; i++) {
-        if (offset + sizeof(key) + sizeof(val) > size) return false;
-        std::memcpy(&key, data + offset, sizeof(key));
-        offset += sizeof(key);
-        std::memcpy(&val, data + offset, sizeof(val));
-        offset += sizeof(val);
-        other_map[key] = val;
-    }
-
     loaded = true;
     return true;
 }

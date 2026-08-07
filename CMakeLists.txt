@@ -9,12 +9,20 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(HOLDEM_BUILD_CLI "Build the command-line frontend" ON)
 option(HOLDEM_BUILD_GUI "Build the EUI-NEO graphical frontend" ON)
 
+if(DEFINED HOLDEM_ROOT)
+    set(HOLDEM_RESOURCE_DIR "${HOLDEM_ROOT}/resources")
+else()
+    set(HOLDEM_RESOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
+endif()
+if(EXISTS "${HOLDEM_RESOURCE_DIR}")
+    file(COPY "${HOLDEM_RESOURCE_DIR}" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
+endif()
+
 set(HOLDEM_CORE_SOURCES
     src/card.cpp
     src/handType.cpp
     src/handType_.cpp
-    src/ranker_data.cpp
-    src/ranker_data_short.cpp
+    src/resource_locator.cpp
     src/player.cpp
     src/humanPlayer.cpp
     src/botPlayer.cpp
@@ -74,8 +82,20 @@ if(HOLDEM_BUILD_GUI)
     )
     target_link_libraries(holdem_gui PRIVATE holdem_core)
     eui_neo_configure_app(holdem_gui)
+    add_custom_command(TARGET holdem_gui POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            "$<TARGET_FILE_DIR:holdem_gui>/assets"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/external/EUI-NEO/assets"
+            "$<TARGET_FILE_DIR:holdem_gui>/assets"
+    )
     eui_neo_copy_app_assets(holdem_gui
         "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+    )
+    add_custom_command(TARGET holdem_gui POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/resources"
+            "$<TARGET_FILE_DIR:holdem_gui>/resources"
     )
 endif()
 

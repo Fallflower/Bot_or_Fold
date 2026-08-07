@@ -1365,7 +1365,11 @@ void composeGame(eui::Ui& ui, const eui::Screen& screen, const ControllerView& v
                                maximum = gestureDecision.maxRaise](
                                   const core::ScrollEvent& event) {
                         constexpr double kAndroidTwoFingerMarker = 7777.0;
-                        if (std::fabs(event.x - kAndroidTwoFingerMarker) > 0.001
+                        const long long markerCount = std::llround(
+                            event.x / kAndroidTwoFingerMarker);
+                        if (markerCount < 1
+                            || std::fabs(event.x
+                                - markerCount * kAndroidTwoFingerMarker) > 0.001
                             || std::fabs(event.y) <= 0.001) return;
                         requestFirstRaiseInteractionFullPaint();
                         const int direction = event.y > 0.0 ? 1 : -1;

@@ -148,6 +148,7 @@ struct AndroidTwoFingerPoint {
 
 struct AndroidTwoFingerGesture {
     std::unordered_map<SDL_FingerID, AndroidTwoFingerPoint> points;
+    double accumulatedY = 0.0;
     bool active = false;
 };
 
@@ -185,7 +186,16 @@ bool handleAndroidTwoFingerInput(SDL_Window* window,
             it->second = {x, y};
             if (finger.type == SDL_FINGERMOTION && dy != 0.0) {
                 constexpr double kAndroidTwoFingerMarker = 7777.0;
-                core::queueScrollInput(window, kAndroidTwoFingerMarker, -dy / 48.0);
+                constexpr double kAndroidTwoFingerStep = 48.0;
+                gesture.accumulatedY -= dy;
+                const int steps = static_cast<int>(
+                    std::fabs(gesture.accumulatedY) / kAndroidTwoFingerStep);
+                if (steps > 0) {
+                    const double direction = gesture.accumulatedY > 0.0 ? 1.0 : -1.0;
+                    core::queueScrollInput(
+                        window, kAndroidTwoFingerMarker, direction * steps);
+                    gesture.accumulatedY -= direction * steps * kAndroidTwoFingerStep;
+                }
             }
         }
         if (finger.type == SDL_FINGERUP) {
@@ -219,6 +229,24 @@ bool handleAndroidTwoFingerInput(SDL_Window* window,
             throw new GradleException("The Android two-finger gesture insertion point no longer matches ${sdlApp}")
         }
         appSource = appSource.replace(positionAnchor, positionReplacement)
+
+        // Once a touch establishes horizontal intent, keep it as a pointer
+        // drag. This prevents fast Raise-slider drags with minor vertical
+        // wobble from being reclassified as page scrolling mid-gesture.
+        String touchStateAnchor = "    bool scrolling = false;\n    bool contextQueued = false;"
+        String touchStateReplacement = "    bool scrolling = false;\n    bool horizontalDragging = false;\n    bool contextQueued = false;"
+        if (appSource.count(touchStateAnchor) != 1) {
+            throw new GradleException("The Android horizontal touch-lock state patch no longer matches ${sdlApp}")
+        }
+        appSource = appSource.replace(touchStateAnchor, touchStateReplacement)
+
+        String scrollIntentAnchor = "    if (!state.scrolling &&\n        std::fabs(state.totalY) >= scrollStartThreshold &&"
+        String scrollIntentReplacement = "    if (!state.scrolling && !state.horizontalDragging &&\n        std::fabs(state.totalX) >= scrollStartThreshold &&\n        std::fabs(state.totalX) >= std::fabs(state.totalY) * 1.05) {\n        state.horizontalDragging = true;\n    }\n\n    if (!state.scrolling && !state.horizontalDragging &&\n        std::fabs(state.totalY) >= scrollStartThreshold &&"
+        if (appSource.count(scrollIntentAnchor) != 1) {
+            throw new GradleException("The Android horizontal touch-lock intent patch no longer matches ${sdlApp}")
+        }
+        appSource = appSource.replace(scrollIntentAnchor, scrollIntentReplacement)
+
         String cleanupAnchor = "    touchScrollStates().erase(window);\n    core::platform::shutdownTray();"
         String cleanupReplacement = "    touchScrollStates().erase(window);\n#ifdef __ANDROID__\n    androidTwoFingerGestures().erase(window);\n#endif\n    core::platform::shutdownTray();"
         if (appSource.count(cleanupAnchor) != 1) {

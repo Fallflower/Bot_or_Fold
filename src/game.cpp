@@ -4,8 +4,6 @@
 #include <thread>
 #include <random>
 #include <type_traits>
-#include "ranker_data.h"
-#include "ranker_data_short.h"
 
 const std::string stateStr[] = {"preflop", "flop", "turn", "river", "end"};
 
@@ -338,11 +336,11 @@ Game<NumT>::Game(const Position& p,const int& c, const HumanPlayer<NumT>& hp, co
     hands[hpi][0].show = 1;
     hands[hpi][1].show = 1;
     if constexpr (std::is_same_v<NumT, CARDNUM>) {
-        if (!initAdvancedRanker(ranker_bin, ranker_bin_len))
-            throw Error(101, "System Error: failed to load embedded ranker data");
+        if (!initAdvancedRanker("resources/card5_dic_zipped.bin"))
+            throw Error(101, "System Error: failed to load standard ranker data");
     } else if constexpr (std::is_same_v<NumT, SHORT_CARDNUM>) {
-        if (!initAdvancedRanker(ranker_short_bin, ranker_short_bin_len))
-            throw Error(101, "System Error: failed to load embedded ranker data");
+        if (!initAdvancedRanker("resources/card5_dic_zipped_shortdeck.bin"))
+            throw Error(101, "System Error: failed to load short-deck ranker data");
     }
 }
 
