@@ -135,7 +135,97 @@ tasks.register("prepareEuiNeoSource") {
         if (appSource.count(drawableOriginal) != 1) {
             throw new GradleException("The EUI Android drawable size patch no longer matches ${sdlApp}")
         }
-        sdlApp.setText(appSource.replace(drawableOriginal, drawableReplacement), "UTF-8")
+        appSource = appSource.replace(drawableOriginal, drawableReplacement)
+
+        // Android 双指上下滑动调整 Raise。双指事件使用独立的输入标记，
+        // 由游戏页的全屏 onScroll 接收，因此手势不要求落在滑动条上。
+        String gestureMarker = "void queueFingerInput(SDL_Window* window, const SDL_TouchFingerEvent& finger) {"
+        String gestureHelpers = '''#ifdef __ANDROID__
+struct AndroidTwoFingerPoint {
+    double x = 0.0;
+    double y = 0.0;
+};
+
+struct AndroidTwoFingerGesture {
+    std::unordered_map<SDL_FingerID, AndroidTwoFingerPoint> points;
+    bool active = false;
+};
+
+std::unordered_map<SDL_Window*, AndroidTwoFingerGesture>& androidTwoFingerGestures() {
+    static std::unordered_map<SDL_Window*, AndroidTwoFingerGesture> gestures;
+    return gestures;
+}
+
+bool handleAndroidTwoFingerInput(SDL_Window* window,
+                                 const SDL_TouchFingerEvent& finger,
+                                 double x, double y) {
+    auto& gesture = androidTwoFingerGestures()[window];
+    if (finger.type == SDL_FINGERDOWN) {
+        if (gesture.active || gesture.points.size() >= 1) {
+            if (gesture.points.size() == 1) {
+                auto first = gesture.points.begin();
+                core::queuePointerInput(window, first->second.x, first->second.y, false);
+                core::queuePointerInput(window, x, y, false);
+                touchScrollStates().erase(window);
+                gesture.active = true;
+            }
+            if (gesture.points.size() < 2) {
+                gesture.points[finger.fingerId] = {x, y};
+            }
+            return true;
+        }
+        gesture.points[finger.fingerId] = {x, y};
+        return false;
+    }
+
+    if (gesture.active) {
+        auto it = gesture.points.find(finger.fingerId);
+        if (it != gesture.points.end()) {
+            const double dy = y - it->second.y;
+            it->second = {x, y};
+            if (finger.type == SDL_FINGERMOTION && dy != 0.0) {
+                constexpr double kAndroidTwoFingerMarker = 7777.0;
+                core::queueScrollInput(window, kAndroidTwoFingerMarker, -dy / 48.0);
+            }
+        }
+        if (finger.type == SDL_FINGERUP) {
+            gesture.points.erase(finger.fingerId);
+            if (gesture.points.empty()) {
+                androidTwoFingerGestures().erase(window);
+            }
+        }
+        return true;
+    }
+
+    if (finger.type == SDL_FINGERUP) {
+        gesture.points.erase(finger.fingerId);
+        if (gesture.points.empty()) {
+            androidTwoFingerGestures().erase(window);
+        }
+    }
+    return false;
+}
+#endif
+
+'''
+        if (appSource.count(gestureMarker) != 1) {
+            throw new GradleException("The Android two-finger gesture patch anchor no longer matches ${sdlApp}")
+        }
+        appSource = appSource.replace(gestureMarker, gestureHelpers + gestureMarker)
+
+        String positionAnchor = "    TouchScrollState& state = touchScrollStates()[window];"
+        String positionReplacement = "#ifdef __ANDROID__\n    if (handleAndroidTwoFingerInput(window, finger, x, y)) {\n        return;\n    }\n#endif\n\n" + positionAnchor
+        if (appSource.count(positionAnchor) != 1) {
+            throw new GradleException("The Android two-finger gesture insertion point no longer matches ${sdlApp}")
+        }
+        appSource = appSource.replace(positionAnchor, positionReplacement)
+        String cleanupAnchor = "    touchScrollStates().erase(window);\n    core::platform::shutdownTray();"
+        String cleanupReplacement = "    touchScrollStates().erase(window);\n#ifdef __ANDROID__\n    androidTwoFingerGestures().erase(window);\n#endif\n    core::platform::shutdownTray();"
+        if (appSource.count(cleanupAnchor) != 1) {
+            throw new GradleException("The Android two-finger gesture cleanup anchor no longer matches ${sdlApp}")
+        }
+        appSource = appSource.replace(cleanupAnchor, cleanupReplacement)
+        sdlApp.setText(appSource, "UTF-8")
     }
 }
 

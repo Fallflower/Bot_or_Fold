@@ -50,7 +50,8 @@ constexpr float kShellHeightRatio = 0.96f;
 constexpr float kShellMinWidth = 640.0f;
 constexpr float kShellMinHeight = 360.0f;
 constexpr float kShellPadding = 14.0f;
-constexpr float kHeaderHeight = 44.0f;
+// Header 包含标题和其下方的 Table setup 按钮。
+constexpr float kHeaderHeight = 88.0f;
 constexpr float kSectionGap = 8.0f;
 constexpr float kFooterHeight = 56.0f;
 
@@ -110,12 +111,12 @@ constexpr float kPlayerCommittedYRatio = 0.485f;
 constexpr float kPlayerCommittedHeightRatio = 0.13f;
 constexpr float kPlayerActionYRatio = 0.68f;
 constexpr float kPlayerActionHeightRatio = 0.25f;
-constexpr float kPlayerNameFontRatio = 0.068f;
-constexpr float kPlayerDetailFontRatio = 0.058f;
+constexpr float kPlayerNameFontRatio = 0.085f;
+constexpr float kPlayerDetailFontRatio = 0.072f;
 constexpr float kPlayerNameFontMin = 14.0f;
-constexpr float kPlayerNameFontMax = 22.0f;
-constexpr float kPlayerDetailFontMin = 13.0f;
-constexpr float kPlayerDetailFontMax = 18.0f;
+constexpr float kPlayerNameFontMax = 30.0f;
+constexpr float kPlayerDetailFontMin = 12.0f;
+constexpr float kPlayerDetailFontMax = 24.0f;
 constexpr float kPlayerFontLineHeightExtra = 3.0f;
 
 // Dealer 圆形标记尺寸及其相对玩家框右上角的偏移。
@@ -896,8 +897,8 @@ void composeCommunity(eui::Ui& ui, const TableSnapshot& table,
                 .border(1.0f, kGold).build();
             text(ui, "game.pot.badge.text", potText, badgeWidth, badgeHeight,
                  result.settled
-                     ? std::clamp(cardWidth * 0.13f, 11.0f, 16.0f)
-                     : std::clamp(cardWidth * 0.19f, 13.0f, 19.0f),
+                     ? std::clamp(cardWidth * 0.17f, 16.0f, 24.0f)
+                     : std::clamp(cardWidth * 0.24f, 18.0f, 28.0f),
                  kGold, eui::HorizontalAlign::Center);
         }).build();
 }
@@ -1287,24 +1288,27 @@ void nextRound() {
 }
 
 void roundActions(eui::Ui& ui, const ControllerView& view, float width) {
-    ui.row("game.round.actions")
-        .size(width, 48.0f).gap(10.0f).alignItems(eui::Align::CENTER)
+    const float nextX = std::clamp(width * 0.32f, 110.0f, width - 180.0f);
+    const float resultX = std::min(width - 220.0f, nextX + 190.0f);
+    ui.stack("game.round.actions")
+        .size(width, 48.0f)
         .content([&] {
             if (!view.table.roundSettled) {
-                text(ui, "game.round.done", "Settling result...", 220.0f, 44.0f,
-                     14.0f, kGold);
+                ui.text("game.round.done").position(resultX, 0.0f)
+                    .size(220.0f, 44.0f).text("Settling result...")
+                    .fontSize(14.0f).lineHeight(18.0f).color(kGold)
+                    .verticalAlign(eui::VerticalAlign::Center).build();
             } else {
-                text(ui, "game.round.done", "Result shown on table", 220.0f, 44.0f,
-                     14.0f, kGreenHover);
                 components::button(ui, "game.round.next")
+                    .position(nextX, 0.0f)
                     .size(180.0f, 44.0f).text("Next round").radius(6.0f)
                     .colors(kGreen, kGreenHover, kGreenPressed)
                     .onClick(nextRound).build();
+                ui.text("game.round.done").position(resultX, 0.0f)
+                    .size(220.0f, 44.0f).text("Result shown on table")
+                    .fontSize(14.0f).lineHeight(18.0f).color(kGreenHover)
+                    .verticalAlign(eui::VerticalAlign::Center).build();
             }
-            components::button(ui, "game.round.setup")
-                .size(170.0f, 44.0f).text("Table setup").radius(6.0f)
-                .theme(components::theme::dark(), false)
-                .onClick(returnToSetup).build();
         }).build();
 }
 
@@ -1347,6 +1351,32 @@ void composeGame(eui::Ui& ui, const eui::Screen& screen, const ControllerView& v
         .content([&] {
             ui.rect("game.background").size(screen.width, screen.height)
                 .color({0.025f, 0.070f, 0.045f, 1.0f}).build();
+#ifdef __ANDROID__
+            // 双指手势使用特殊 x 标记，避免普通单指滚动改变 Raise。
+            // 该接收层不参与普通点击，只负责在任意位置接收双指滚动。
+            const DecisionRequest& gestureDecision = view.table.decision;
+            if (view.state == ControllerState::WaitingForHuman
+                && hasAction(gestureDecision, RAISE)
+                && gestureDecision.maxRaise > gestureDecision.minRaise) {
+                ui.rect("game.android.raise.gesture")
+                    .size(screen.width, screen.height)
+                    .zIndex(-100).interactive()
+                    .onScroll([minimum = gestureDecision.minRaise,
+                               maximum = gestureDecision.maxRaise](
+                                  const core::ScrollEvent& event) {
+                        constexpr double kAndroidTwoFingerMarker = 7777.0;
+                        if (std::fabs(event.x - kAndroidTwoFingerMarker) > 0.001
+                            || std::fabs(event.y) <= 0.001) return;
+                        requestFirstRaiseInteractionFullPaint();
+                        const int direction = event.y > 0.0 ? 1 : -1;
+                        const int notches = std::clamp(
+                            static_cast<int>(std::lround(std::fabs(event.y))),
+                            1, action_layout::kRaiseWheelMaxNotches);
+                        state.raiseAmount = raiseAmountFromWheel(
+                            state.raiseAmount, minimum, maximum, direction, notches);
+                    }).build();
+            }
+#endif
             ui.stack("game.shell")
                 .position(shellX, shellY).size(shellWidth, shellHeight)
                 .content([&] {
@@ -1355,18 +1385,27 @@ void composeGame(eui::Ui& ui, const eui::Screen& screen, const ControllerView& v
                         .size(innerWidth, table_layout::kHeaderHeight)
                         .alignItems(eui::Align::CENTER)
                         .content([&] {
-                            text(ui, "game.title", "Bot or Fold", innerWidth * 0.32f,
-                                 44.0f, 24.0f);
+                            ui.stack("game.header.left")
+                                .size(innerWidth * 0.32f, table_layout::kHeaderHeight)
+                                .content([&] {
+                                    text(ui, "game.title", "Bot or Fold", innerWidth * 0.32f,
+                                         40.0f, 32.0f);
+                                    components::button(ui, "game.header.setup")
+                                        .position(0.0f, 42.0f)
+                                        .size(170.0f, 40.0f).text("Table setup").radius(6.0f)
+                                        .theme(components::theme::dark(), false)
+                                        .onClick(returnToSetup).build();
+                                }).build();
                             const std::string status = view.state == ControllerState::BotThinking
                                 ? "Bot is thinking..." : view.state == ControllerState::WaitingForHuman
                                 ? "Your turn" : view.table.roundSettled ? "Result ready" : "Round complete";
                             text(ui, "game.street", view.table.state + "  -  " + status,
-                                 innerWidth * 0.36f, 44.0f, 14.0f,
+                                 innerWidth * 0.36f, 44.0f, 24.0f,
                                  view.state == ControllerState::BotThinking ? kGold : kMuted,
                                  eui::HorizontalAlign::Center);
                             text(ui, "game.mode",
                                  view.config.mode == GameMode::Standard ? "STANDARD" : "SHORT DECK",
-                                 innerWidth * 0.32f, 44.0f, 13.0f, kMuted,
+                                 innerWidth * 0.32f, 44.0f, 24.0f, kMuted,
                                  eui::HorizontalAlign::Right);
                         }).build();
 
@@ -1383,7 +1422,7 @@ void composeGame(eui::Ui& ui, const eui::Screen& screen, const ControllerView& v
                                 roundActions(ui, view, innerWidth);
                             else
                                 text(ui, "game.bot.wait", "Calculating the next action...", innerWidth,
-                                     48.0f, 15.0f, kMuted, eui::HorizontalAlign::Center);
+                                     48.0f, 16.0f, kMuted, eui::HorizontalAlign::Center);
                         }).build();
                 }).build();
         }).build();
