@@ -496,56 +496,96 @@ void settleEndedRoundIfNeeded(const ControllerView& view) {
     }
 }
 
-void setupRow(eui::Ui& ui, const std::string& id, const std::string& label,
+struct SetupMetrics {
+    float scale = 1.0f;
+    float padding = 24.0f;
+    float gap = 14.0f;
+    float rowHeight = 48.0f;
+    float controlHeight = 42.0f;
+    float labelFont = 16.0f;
+    float controlFont = 17.0f;
+    float titleFont = 32.0f;
+    float subtitleFont = 16.0f;
+    float hintFont = 14.0f;
+    float buttonFont = 18.0f;
+};
+
+SetupMetrics setupMetrics(const eui::Screen& screen) {
+    const float minimumDimension = std::min(screen.width, screen.height);
+    SetupMetrics metrics;
+    metrics.scale = std::clamp(minimumDimension / 600.0f, 0.92f, 1.22f);
+    metrics.padding = std::clamp(20.0f * metrics.scale, 18.0f, 26.0f);
+    metrics.gap = std::clamp(10.0f * metrics.scale, 9.0f, 13.0f);
+    metrics.rowHeight = std::clamp(52.0f * metrics.scale, 49.0f, 64.0f);
+    metrics.controlHeight = std::clamp(48.0f * metrics.scale, 45.0f, 60.0f);
+    metrics.labelFont = std::clamp(20.0f * metrics.scale, 19.0f, 26.0f);
+    metrics.controlFont = std::clamp(21.0f * metrics.scale, 20.0f, 27.0f);
+    metrics.titleFont = std::clamp(40.0f * metrics.scale, 38.0f, 50.0f);
+    metrics.subtitleFont = std::clamp(20.0f * metrics.scale, 19.0f, 25.0f);
+    metrics.hintFont = std::clamp(17.0f * metrics.scale, 16.0f, 22.0f);
+    metrics.buttonFont = std::clamp(22.0f * metrics.scale, 21.0f, 28.0f);
+    return metrics;
+}
+
+void setupRow(eui::Ui& ui, const SetupMetrics& metrics,
+              const std::string& id, const std::string& label,
               float width, const std::function<void(float)>& composeControl) {
-    if (width < 390.0f) {
+    if (width < 430.0f * metrics.scale) {
         ui.column(id)
-            .size(width, 72.0f)
-            .gap(4.0f)
+            .size(width, metrics.controlHeight + 28.0f + metrics.gap)
+            .gap(metrics.gap * 0.35f)
             .content([&] {
-                text(ui, id + ".label", label, width, 24.0f, 14.0f, kMuted);
+                text(ui, id + ".label", label, width, 26.0f * metrics.scale,
+                     metrics.labelFont, kMuted);
                 composeControl(width);
             })
             .build();
         return;
     }
 
-    const float labelWidth = 150.0f;
-    const float controlWidth = width - labelWidth - 14.0f;
+    const float labelWidth = std::clamp(width * 0.30f,
+                                        126.0f * metrics.scale,
+                                        190.0f * metrics.scale);
+    const float controlWidth = std::max(0.0f, width - labelWidth - metrics.gap);
     ui.row(id)
-        .size(width, 46.0f)
-        .gap(14.0f)
+        .size(width, metrics.rowHeight)
+        .gap(metrics.gap)
         .alignItems(eui::Align::CENTER)
         .content([&] {
-            text(ui, id + ".label", label, labelWidth, 42.0f, 15.0f, kMuted);
+            text(ui, id + ".label", label, labelWidth, metrics.rowHeight,
+                 metrics.labelFont, kMuted);
             composeControl(controlWidth);
         })
         .build();
 }
 
-void composePositionSelector(eui::Ui& ui, float width) {
-    const float buttonWidth = 52.0f;
-    const float labelWidth = width - buttonWidth * 2.0f - 16.0f;
+void composePositionSelector(eui::Ui& ui, const SetupMetrics& metrics, float width) {
+    const float buttonWidth = std::clamp(52.0f * metrics.scale, 48.0f, 70.0f);
+    const float gap = std::clamp(8.0f * metrics.scale, 6.0f, 10.0f);
+    const float labelWidth = std::max(0.0f, width - buttonWidth * 2.0f - gap * 2.0f);
     ui.row("setup.position.selector")
-        .size(width, 42.0f).gap(8.0f).alignItems(eui::Align::CENTER)
+        .size(width, metrics.controlHeight).gap(gap).alignItems(eui::Align::CENTER)
         .content([&] {
             components::button(ui, "setup.position.previous")
-                .size(buttonWidth, 40.0f).text("<").radius(6.0f)
+                .size(buttonWidth, metrics.controlHeight).text("<").fontSize(metrics.buttonFont)
+                .radius(6.0f)
                 .colors(kSurfaceRaised, kBorder, kSurface)
                 .onClick([] {
                     state.humanPlayerIndex = (state.humanPlayerIndex + state.playerCount - 1)
                         % state.playerCount;
                 }).build();
             ui.stack("setup.position.name")
-                .size(labelWidth, 40.0f).content([&] {
+                .size(labelWidth, metrics.controlHeight).content([&] {
                     ui.rect("setup.position.name.bg")
-                        .size(labelWidth, 40.0f).color(kBackground)
+                        .size(labelWidth, metrics.controlHeight).color(kBackground)
                         .radius(6.0f).border(1.0f, kBorder).build();
                     text(ui, "setup.position.name.text", selectedPositionName(),
-                         labelWidth, 40.0f, 16.0f, kText, eui::HorizontalAlign::Center);
+                         labelWidth, metrics.controlHeight, metrics.controlFont, kText,
+                         eui::HorizontalAlign::Center);
                 }).build();
             components::button(ui, "setup.position.next")
-                .size(buttonWidth, 40.0f).text(">").radius(6.0f)
+                .size(buttonWidth, metrics.controlHeight).text(">").fontSize(metrics.buttonFont)
+                .radius(6.0f)
                 .colors(kSurfaceRaised, kBorder, kSurface)
                 .onClick([] {
                     state.humanPlayerIndex = (state.humanPlayerIndex + 1) % state.playerCount;
@@ -554,10 +594,94 @@ void composePositionSelector(eui::Ui& ui, float width) {
 }
 
 void composeSetup(eui::Ui& ui, const eui::Screen& screen) {
-    const float panelWidth = std::max(0.0f, std::min(590.0f, screen.width - 24.0f));
-    const float panelHeight = std::max(0.0f, std::min(750.0f, screen.height - 24.0f));
+    const SetupMetrics metrics = setupMetrics(screen);
+    // A merely non-portrait window is not wide enough for two columns once
+    // controls and fonts are enlarged. Near-square windows use portrait flow.
+    const bool landscape = screen.width >= screen.height * 1.35f;
+    const float panelWidth = landscape
+        ? std::max(0.0f, screen.width - 24.0f)
+        : std::max(0.0f, std::min(680.0f * metrics.scale, screen.width - 24.0f));
+    const float panelHeight = std::max(0.0f, screen.height - 24.0f);
     const float panelX = std::max(0.0f, (screen.width - panelWidth) * 0.5f);
     const float panelY = std::max(0.0f, (screen.height - panelHeight) * 0.5f);
+
+    auto startGame = [] {
+        GameConfig config;
+        config.playerName = state.playerName;
+        config.playerCount = state.playerCount;
+        config.initialChips = state.initialChips;
+        config.humanPlayerIndex = state.humanPlayerIndex;
+        config.mode = state.mode == 0 ? GameMode::Standard : GameMode::ShortDeck;
+        if (controller.startGame(config)) {
+            state.decisionPlayer = -1;
+            holdem::gui::requestPresentation(
+                holdem::gui::Presentation::Game, kTableWidth, kTableHeight);
+        }
+    };
+
+    auto composeForm = [&](eui::Ui& formUi, float formWidth, float formHeight,
+                           bool includeStart) {
+        formUi.column("setup.form")
+            .size(formWidth, formHeight)
+            .padding(metrics.padding).gap(metrics.gap)
+            .content([&] {
+                const float innerWidth = std::max(0.0f, formWidth - metrics.padding * 2.0f);
+                text(formUi, "setup.title", "Bot or Fold", innerWidth,
+                     48.0f * metrics.scale, metrics.titleFont);
+                text(formUi, "setup.subtitle", "Create a new poker table", innerWidth,
+                     28.0f * metrics.scale, metrics.subtitleFont, kMuted);
+
+                setupRow(formUi, metrics, "setup.name", "Player name", innerWidth,
+                         [&](float width) {
+                    components::input(formUi, "setup.name.input")
+                        .size(width, metrics.controlHeight).fontSize(metrics.controlFont)
+                        .value(state.playerName).placeholder("Player")
+                        .onChange([](const std::string& value) { state.playerName = value; })
+                        .build();
+                });
+                setupRow(formUi, metrics, "setup.mode", "Game mode", innerWidth,
+                         [&](float width) {
+                    components::segmented(formUi, "setup.mode.segmented")
+                        .size(width, metrics.controlHeight).fontSize(metrics.controlFont)
+                        .items({"Standard", "Short Deck"}).selected(state.mode)
+                        .onChange([](int value) { state.mode = value; }).build();
+                });
+                setupRow(formUi, metrics, "setup.players", "Players", innerWidth,
+                         [&](float width) {
+                    components::stepper(formUi, "setup.players.stepper")
+                        .size(width, metrics.controlHeight).fontSize(metrics.controlFont)
+                        .value(state.playerCount).min(2).max(9)
+                        .onChange([](long long value) {
+                            state.playerCount = static_cast<int>(value);
+                            state.humanPlayerIndex = std::min(
+                                state.humanPlayerIndex, state.playerCount - 1);
+                        }).build();
+                });
+                setupRow(formUi, metrics, "setup.chips", "Starting chips", innerWidth,
+                         [&](float width) {
+                    components::stepper(formUi, "setup.chips.stepper")
+                        .size(width, metrics.controlHeight).fontSize(metrics.controlFont)
+                        .value(state.initialChips).step(50).min(50).max(5000)
+                        .onChange([](long long value) {
+                            state.initialChips = static_cast<int>(value);
+                        }).build();
+                });
+                setupRow(formUi, metrics, "setup.position", "Your position", innerWidth,
+                         [&](float width) { composePositionSelector(formUi, metrics, width); });
+
+                formUi.rect("setup.divider").size(innerWidth, 1.0f).color(kBorder).build();
+                text(formUi, "setup.hint",
+                     "Your position is shown by its poker name (SB, BB, UTG, CO, D).",
+                     innerWidth, 36.0f * metrics.scale, metrics.hintFont, kMuted);
+                if (includeStart) {
+                    components::button(formUi, "setup.start")
+                        .size(innerWidth, 52.0f * metrics.scale).text("Start game")
+                        .fontSize(metrics.buttonFont).radius(7.0f)
+                        .colors(kGreen, kGreenHover, kGreenPressed)
+                        .onClick(startGame).build();
+                }
+            }).build();
+    };
 
     ui.stack("setup.root")
         .size(screen.width, screen.height)
@@ -571,91 +695,49 @@ void composeSetup(eui::Ui& ui, const eui::Screen& screen) {
                         .color(kSurface).radius(10.0f).border(1.0f, kBorder)
                         .shadow(28.0f, 0.0f, 10.0f, {0.0f, 0.0f, 0.0f, 0.34f})
                         .build();
-                    components::scrollView(ui, "setup.scroll")
-                        .size(panelWidth, panelHeight)
-                        .offset(state.setupScrollOffset)
-                        .step(52.0f)
-                        .scrollbarWidth(7.0f)
-                        .scrollbarGap(5.0f)
-                        .onChange([](float value) { state.setupScrollOffset = value; })
-                        .content([&](eui::Ui& contentUi, float contentWidth, float) {
-                            const float innerWidth = std::max(0.0f, contentWidth - 48.0f);
-                            contentUi.column("setup.form")
-                                .size(contentWidth, 750.0f)
-                                .padding(24.0f).gap(14.0f)
-                                .content([&] {
-                                    text(contentUi, "setup.title", "Bot or Fold", innerWidth,
-                                         44.0f, 30.0f);
-                                    text(contentUi, "setup.subtitle", "Create a new poker table",
-                                         innerWidth, 26.0f, 14.0f, kMuted);
-
-                                    setupRow(contentUi, "setup.name", "Player name", innerWidth,
-                                             [&](float width) {
-                                        components::input(contentUi, "setup.name.input")
-                                            .size(width, 42.0f).value(state.playerName)
-                                            .placeholder("Player")
-                                            .onChange([](const std::string& value) {
-                                                state.playerName = value;
-                                            }).build();
-                                    });
-                                    setupRow(contentUi, "setup.mode", "Game mode", innerWidth,
-                                             [&](float width) {
-                                        components::segmented(contentUi, "setup.mode.segmented")
-                                            .size(width, 40.0f).items({"Standard", "Short Deck"})
-                                            .selected(state.mode)
-                                            .onChange([](int value) { state.mode = value; }).build();
-                                    });
-                                    setupRow(contentUi, "setup.players", "Players", innerWidth,
-                                             [&](float width) {
-                                        components::stepper(contentUi, "setup.players.stepper")
-                                            .size(width, 40.0f).value(state.playerCount).min(2).max(9)
-                                            .onChange([](long long value) {
-                                                state.playerCount = static_cast<int>(value);
-                                                state.humanPlayerIndex = std::min(
-                                                    state.humanPlayerIndex,
-                                                    state.playerCount - 1);
-                                            }).build();
-                                    });
-                                    setupRow(contentUi, "setup.chips", "Starting chips", innerWidth,
-                                             [&](float width) {
-                                        components::stepper(contentUi, "setup.chips.stepper")
-                                            .size(width, 40.0f).value(state.initialChips)
-                                            .step(50).min(50).max(5000)
-                                            .onChange([](long long value) {
-                                                state.initialChips = static_cast<int>(value);
-                                            }).build();
-                                    });
-                                    setupRow(contentUi, "setup.position", "Your position", innerWidth,
-                                             [&](float width) {
-                                        composePositionSelector(contentUi, width);
-                                    });
-
-                                    contentUi.rect("setup.divider")
-                                        .size(innerWidth, 1.0f).color(kBorder).build();
-                                    text(contentUi, "setup.hint",
-                                         "Your position is shown by its poker name (SB, BB, UTG, CO, D).",
-                                         innerWidth, 34.0f, 13.0f, kMuted);
-                                    components::button(contentUi, "setup.start")
-                                        .size(innerWidth, 50.0f).text("Start game").radius(7.0f)
-                                        .colors(kGreen, kGreenHover, kGreenPressed)
-                                        .onClick([] {
-                                            GameConfig config;
-                                            config.playerName = state.playerName;
-                                            config.playerCount = state.playerCount;
-                                            config.initialChips = state.initialChips;
-                                            config.humanPlayerIndex = state.humanPlayerIndex;
-                                            config.mode = state.mode == 0
-                                                ? GameMode::Standard : GameMode::ShortDeck;
-                                            if (controller.startGame(config)) {
-                                                state.decisionPlayer = -1;
-                                                holdem::gui::requestPresentation(
-                                                    holdem::gui::Presentation::Game,
-                                                    kTableWidth,
-                                                    kTableHeight);
-                                            }
-                                        }).build();
-                                }).build();
-                        }).build();
+                    const float contentHeight = panelHeight - metrics.padding * 2.0f;
+                    if (landscape) {
+                        const float contentWidth = panelWidth - metrics.padding * 2.0f;
+                        const float actionWidth = contentWidth * 0.22f;
+                        const float formWidth = contentWidth - actionWidth - metrics.gap;
+                        ui.row("setup.landscape.content")
+                            .position(metrics.padding, metrics.padding)
+                            .size(contentWidth, contentHeight).gap(metrics.gap)
+                            .content([&] {
+                                composeForm(ui, formWidth, contentHeight, false);
+                                ui.stack("setup.action.panel")
+                                    .size(actionWidth, contentHeight)
+                                    .content([&] {
+                                        ui.rect("setup.action.background")
+                                            .size(actionWidth, contentHeight)
+                                            .color(kSurfaceRaised).radius(8.0f)
+                                            .border(1.0f, kBorder).build();
+                                        const float buttonWidth = actionWidth * 0.56f;
+                                        const float buttonHeight = contentHeight * 0.78f;
+                                        const float buttonX = (actionWidth - buttonWidth) * 0.5f;
+                                        const float buttonY = (contentHeight - buttonHeight) * 0.5f;
+                                        components::button(ui, "setup.start")
+                                            .position(buttonX, buttonY)
+                                            .size(buttonWidth, buttonHeight)
+                                            .text("S\nT\nA\nR\nT\n\nG\nA\nM\nE")
+                                            .fontSize(metrics.buttonFont).radius(7.0f)
+                                            .colors(kGreen, kGreenHover, kGreenPressed)
+                                            .onClick(startGame).build();
+                                    }).build();
+                            }).build();
+                    } else {
+                        components::scrollView(ui, "setup.scroll")
+                            .position(0.0f, 0.0f).size(panelWidth, panelHeight)
+                            .offset(state.setupScrollOffset).step(52.0f * metrics.scale)
+                            .scrollbarWidth(7.0f * metrics.scale)
+                            .scrollbarGap(5.0f * metrics.scale)
+                            .onChange([](float value) { state.setupScrollOffset = value; })
+                            .content([&](eui::Ui& contentUi, float contentWidth, float) {
+                                const float formHeight = std::max(
+                                    contentHeight, 700.0f * metrics.scale);
+                                composeForm(contentUi, contentWidth, formHeight, true);
+                            }).build();
+                    }
                 }).build();
         }).build();
 }
