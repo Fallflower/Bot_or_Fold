@@ -93,7 +93,7 @@ cmake --build build --target holdem_gui -j 4
 Windows 下生成：
 
 ```text
-build/holdem_gui.exe
+build/Bot or Fold.exe
 ```
 
 可以直接运行该程序，也可以通过 CMake 启动：
@@ -101,6 +101,15 @@ build/holdem_gui.exe
 ```bash
 cmake --build build --target run_gui
 ```
+
+## 多平台发布构建
+
+GitHub Actions 工作流可手动构建四个平台，也会在推送 `v*` tag 时创建
+GitHub Release。Release 中每个平台只有一个下载文件：Windows portable ZIP、
+Linux x86_64 AppImage、macOS Universal 2 DMG 和 Android arm64-v8a debug APK。
+
+所有平台图标均由 `assets/icon.png` 派生；牌型表继续以
+`resources/*.bin` 外部资源文件随各平台包发布。
 
 ## 其他构建目标
 

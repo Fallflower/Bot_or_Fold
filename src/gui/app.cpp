@@ -593,15 +593,51 @@ void composePositionSelector(eui::Ui& ui, const SetupMetrics& metrics, float wid
         }).build();
 }
 
+float setupRowHeight(const SetupMetrics& metrics, float width) {
+    if (width < 430.0f * metrics.scale) {
+        return metrics.controlHeight + 28.0f + metrics.gap;
+    }
+    return metrics.rowHeight;
+}
+
+float setupFormHeight(const SetupMetrics& metrics, float formWidth, bool includeStart) {
+    const float innerWidth = std::max(0.0f, formWidth - metrics.padding * 2.0f);
+    const float rowHeight = setupRowHeight(metrics, innerWidth);
+    const float titleHeight = 48.0f * metrics.scale;
+    const float subtitleHeight = 28.0f * metrics.scale;
+    const float hintHeight = 36.0f * metrics.scale;
+    const float buttonHeight = includeStart ? 52.0f * metrics.scale : 0.0f;
+    const int childCount = includeStart ? 10 : 9;
+    return metrics.padding * 2.0f
+        + titleHeight + subtitleHeight
+        + rowHeight * 5.0f
+        + 1.0f + hintHeight + buttonHeight
+        + metrics.gap * static_cast<float>(childCount - 1);
+}
+
 void composeSetup(eui::Ui& ui, const eui::Screen& screen) {
     const SetupMetrics metrics = setupMetrics(screen);
     // A merely non-portrait window is not wide enough for two columns once
     // controls and fonts are enlarged. Near-square windows use portrait flow.
     const bool landscape = screen.width >= screen.height * 1.35f;
+    const float viewportMargin = std::clamp(12.0f * metrics.scale, 10.0f, 16.0f);
+    const float availableWidth = std::max(0.0f, screen.width - viewportMargin * 2.0f);
+    const float availableHeight = std::max(0.0f, screen.height - viewportMargin * 2.0f);
     const float panelWidth = landscape
-        ? std::max(0.0f, screen.width - 24.0f)
-        : std::max(0.0f, std::min(680.0f * metrics.scale, screen.width - 24.0f));
-    const float panelHeight = std::max(0.0f, screen.height - 24.0f);
+        ? availableWidth
+        : std::min(680.0f * metrics.scale, availableWidth);
+
+    float desiredPanelHeight = 0.0f;
+    if (landscape) {
+        const float contentWidth = std::max(0.0f, panelWidth - metrics.padding * 2.0f);
+        const float actionWidth = contentWidth * 0.22f;
+        const float formWidth = std::max(0.0f, contentWidth - actionWidth - metrics.gap);
+        desiredPanelHeight = setupFormHeight(metrics, formWidth, false)
+            + metrics.padding * 2.0f;
+    } else {
+        desiredPanelHeight = setupFormHeight(metrics, panelWidth, true);
+    }
+    const float panelHeight = std::min(availableHeight, desiredPanelHeight);
     const float panelX = std::max(0.0f, (screen.width - panelWidth) * 0.5f);
     const float panelY = std::max(0.0f, (screen.height - panelHeight) * 0.5f);
 
@@ -704,7 +740,19 @@ void composeSetup(eui::Ui& ui, const eui::Screen& screen) {
                             .position(metrics.padding, metrics.padding)
                             .size(contentWidth, contentHeight).gap(metrics.gap)
                             .content([&] {
-                                composeForm(ui, formWidth, contentHeight, false);
+                                components::scrollView(ui, "setup.landscape.form.scroll")
+                                    .size(formWidth, contentHeight)
+                                    .offset(state.setupScrollOffset)
+                                    .step(52.0f * metrics.scale)
+                                    .scrollbarWidth(7.0f * metrics.scale)
+                                    .scrollbarGap(5.0f * metrics.scale)
+                                    .onChange([](float value) {
+                                        state.setupScrollOffset = value;
+                                    })
+                                    .content([&](eui::Ui& contentUi, float scrollWidth, float) {
+                                        composeForm(contentUi, scrollWidth,
+                                            setupFormHeight(metrics, scrollWidth, false), false);
+                                    }).build();
                                 ui.stack("setup.action.panel")
                                     .size(actionWidth, contentHeight)
                                     .content([&] {
@@ -733,9 +781,8 @@ void composeSetup(eui::Ui& ui, const eui::Screen& screen) {
                             .scrollbarGap(5.0f * metrics.scale)
                             .onChange([](float value) { state.setupScrollOffset = value; })
                             .content([&](eui::Ui& contentUi, float contentWidth, float) {
-                                const float formHeight = std::max(
-                                    contentHeight, 700.0f * metrics.scale);
-                                composeForm(contentUi, contentWidth, formHeight, true);
+                                composeForm(contentUi, contentWidth,
+                                    setupFormHeight(metrics, contentWidth, true), true);
                             }).build();
                     }
                 }).build();

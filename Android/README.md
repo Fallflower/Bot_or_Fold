@@ -25,6 +25,12 @@ Install Android Studio with the toolchain above, then run from the repository ro
 .\Android\scripts\build-apk.ps1
 ```
 
+If Gradle or SDL2 must be downloaded through a local HTTP proxy:
+
+```powershell
+.\Android\scripts\build-apk.ps1 -Proxy http://127.0.0.1:9090
+```
+
 The debug APK is written to:
 
 ```text
@@ -32,13 +38,15 @@ Android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
 The Android target builds the real Holdem setup page, game core, and table GUI. The
-setup page uses a fixed portrait orientation; starting a game switches to a fixed
-landscape orientation, and returning to table setup restores portrait orientation.
+setup page follows the user's device orientation and switches between its
+single-column and two-column layouts using the actual SDL viewport. Starting a game
+switches to a fixed landscape orientation; returning to table setup restores
+`fullUser` orientation.
 The activity also closes the soft keyboard before changing orientation so the IME
 and SDL surface do not compete to resize the drawable during the transition. Holdem
-overrides SDL's Android orientation hook so its resizable native window cannot reset
-the activity to `fullUser`. The manifest identifies the app as a game so Android 16
-applies its documented game exception for orientation restrictions.
+overrides SDL's Android orientation hook so its resizable native window cannot
+replace this page-specific policy. The manifest identifies the app as a game so
+Android 16 applies its documented game exception for orientation restrictions.
 
 The Android build compiles a generated copy of EUI-NEO with compositor-managed
 Vulkan rotation. The pinned EUI backend advertises `currentTransform` without doing

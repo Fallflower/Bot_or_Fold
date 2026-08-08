@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Bot or Fold
+Comment=Play Texas Hold'em against poker bots
+Exec=bot-or-fold
+Icon=bot-or-fold
+Categories=Game;CardGame;
+Terminal=false
+StartupNotify=true

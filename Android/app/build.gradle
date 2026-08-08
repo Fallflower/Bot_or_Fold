@@ -21,6 +21,8 @@ def generatedFrameworkAssetsDir = file("$buildDir/generated/euiFrameworkAssets")
 def generatedGameAssetsDir = file("$buildDir/generated/holdemGameAssets")
 def generatedResourceAssetsDir = file("$buildDir/generated/holdemResourceAssets")
 def generatedIconResDir = file("$buildDir/generated/holdemLauncherIcon")
+def holdemVersionName = providers.gradleProperty("holdemVersion").getOrElse("0.1.0")
+def holdemVersionCode = providers.gradleProperty("holdemVersionCode").getOrElse("1").toInteger()
 
 tasks.register("downloadSdl2") {
     outputs.file(sdl2Archive)
@@ -289,8 +291,8 @@ android {
         applicationId "io.github.fallflower.botorfold"
         minSdk 26
         targetSdk 36
-        versionCode 1
-        versionName "0.1.0-android-stage-b"
+        versionCode holdemVersionCode
+        versionName holdemVersionName
 
         externalNativeBuild {
             cmake {

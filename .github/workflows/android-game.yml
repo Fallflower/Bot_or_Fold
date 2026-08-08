@@ -1,24 +1,17 @@
-name: Android game APK
+name: Build release artifacts
 
 on:
   workflow_dispatch:
   push:
-    paths:
-      - "Android/**"
-      - "assets/**"
-      - "resources/**"
-      - "include/**"
-      - "src/**"
-      - "external/EUI-NEO"
-      - "CMakeLists.txt"
-      - ".gitmodules"
-      - ".github/workflows/android-game.yml"
+    tags:
+      - "v*"
 
 permissions:
   contents: read
 
 jobs:
-  debug-apk:
+  android:
+    name: Android arm64-v8a APK
     runs-on: ubuntu-latest
 
     steps:
@@ -26,6 +19,17 @@ jobs:
         uses: actions/checkout@v5
         with:
           submodules: recursive
+
+      - name: Set release version
+        id: version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="0.1.0-dev.${GITHUB_RUN_NUMBER}"
+          fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
 
       - name: Set up Java
         uses: actions/setup-java@v5
@@ -58,11 +62,258 @@ jobs:
         shell: bash
         run: |
           chmod +x external/EUI-NEO/Android/gradlew
-          external/EUI-NEO/Android/gradlew -p Android :app:assembleDebug
+          external/EUI-NEO/Android/gradlew -p Android \
+            :app:assembleDebug \
+            -PholdemVersion="${{ steps.version.outputs.value }}" \
+            -PholdemVersionCode="$GITHUB_RUN_NUMBER"
+          mkdir -p dist
+          cp Android/app/build/outputs/apk/debug/app-debug.apk \
+            "dist/Bot-or-Fold-${{ steps.version.outputs.value }}-Android-arm64-v8a-debug.apk"
 
       - name: Upload game APK
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
-          name: bot-or-fold-android-game
-          path: Android/app/build/outputs/apk/debug/app-debug.apk
+          name: android-apk
+          path: dist/*.apk
           if-no-files-found: error
+
+  windows:
+    name: Windows portable ZIP
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set release version
+        id: version
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_TYPE -eq "tag") {
+            $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          } else {
+            $version = "0.1.0-dev.$env:GITHUB_RUN_NUMBER"
+          }
+          "value=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Set up MinGW
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-python-pillow
+
+      - name: Generate Windows icon
+        shell: msys2 {0}
+        run: |
+          python packaging/generate_icons.py \
+            assets/icon.png build-icons/BotOrFold.ico --format ico
+
+      - name: Build and install
+        shell: msys2 {0}
+        run: |
+          cmake -S . -B build-release -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DHOLDEM_BUILD_CLI=OFF \
+            -DHOLDEM_VERSION="${{ steps.version.outputs.value }}" \
+            -DHOLDEM_APP_ICON="$PWD/build-icons/BotOrFold.ico"
+          cmake --build build-release --parallel
+          cmake --install build-release \
+            --prefix "$PWD/package/Bot-or-Fold"
+
+      - name: Include MinGW runtime DLLs when required
+        shell: msys2 {0}
+        run: |
+          while IFS= read -r dll; do
+            if [[ -n "$dll" ]]; then
+              cp -n "$dll" package/Bot-or-Fold/
+            fi
+          done < <(ldd "package/Bot-or-Fold/Bot or Fold.exe" \
+            | awk '/\/mingw64\/bin\// { print $3 }' | sort -u)
+
+      - name: Create portable ZIP
+        shell: msys2 {0}
+        run: |
+          mkdir -p dist
+          cmake -E chdir package cmake -E tar cf \
+            "../dist/Bot-or-Fold-${{ steps.version.outputs.value }}-Windows-x86_64.zip" \
+            --format=zip -- Bot-or-Fold
+          cmake -E tar tf \
+            "dist/Bot-or-Fold-${{ steps.version.outputs.value }}-Windows-x86_64.zip"
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-portable
+          path: dist/*.zip
+          if-no-files-found: error
+
+  linux:
+    name: Linux x86_64 AppImage
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set release version
+        id: version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="0.1.0-dev.${GITHUB_RUN_NUMBER}"
+          fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake ninja-build build-essential libgl1-mesa-dev \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev \
+            libxi-dev libwayland-dev libxkbcommon-dev
+
+      - name: Build and install AppDir
+        run: |
+          cmake -S . -B build-release -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DHOLDEM_BUILD_CLI=OFF \
+            -DHOLDEM_VERSION="${{ steps.version.outputs.value }}"
+          cmake --build build-release --parallel
+          cmake --install build-release --prefix "$PWD/AppDir/usr"
+
+      - name: Build AppImage
+        env:
+          OUTPUT: Bot-or-Fold-${{ steps.version.outputs.value }}-Linux-x86_64.AppImage
+        run: |
+          mkdir -p build-icons
+          cp assets/icon.png build-icons/bot-or-fold.png
+          curl -L --fail --retry 3 \
+            -o linuxdeploy.AppImage \
+            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          chmod +x linuxdeploy.AppImage
+          APPIMAGE_EXTRACT_AND_RUN=1 ./linuxdeploy.AppImage \
+            --appdir AppDir \
+            --desktop-file packaging/linux/bot-or-fold.desktop \
+            --icon-file build-icons/bot-or-fold.png \
+            --output appimage
+          mkdir -p dist
+          mv "$OUTPUT" dist/
+          chmod +x "dist/$OUTPUT"
+          test -s "dist/$OUTPUT"
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: dist/*.AppImage
+          if-no-files-found: error
+
+  macos:
+    name: macOS Universal 2 DMG
+    runs-on: macos-14
+
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set release version
+        id: version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="0.1.0-dev.${GITHUB_RUN_NUMBER}"
+          fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Generate ICNS from the project icon
+        shell: bash
+        run: |
+          mkdir -p build-icons/BotOrFold.iconset
+          sips -z 16 16 assets/icon.png --out build-icons/BotOrFold.iconset/icon_16x16.png
+          sips -z 32 32 assets/icon.png --out build-icons/BotOrFold.iconset/icon_16x16@2x.png
+          sips -z 32 32 assets/icon.png --out build-icons/BotOrFold.iconset/icon_32x32.png
+          sips -z 64 64 assets/icon.png --out build-icons/BotOrFold.iconset/icon_32x32@2x.png
+          sips -z 128 128 assets/icon.png --out build-icons/BotOrFold.iconset/icon_128x128.png
+          sips -z 256 256 assets/icon.png --out build-icons/BotOrFold.iconset/icon_128x128@2x.png
+          sips -z 256 256 assets/icon.png --out build-icons/BotOrFold.iconset/icon_256x256.png
+          sips -z 512 512 assets/icon.png --out build-icons/BotOrFold.iconset/icon_256x256@2x.png
+          sips -z 512 512 assets/icon.png --out build-icons/BotOrFold.iconset/icon_512x512.png
+          sips -z 1024 1024 assets/icon.png --out build-icons/BotOrFold.iconset/icon_512x512@2x.png
+          iconutil -c icns build-icons/BotOrFold.iconset \
+            -o build-icons/BotOrFold.icns
+
+      - name: Build Universal 2 application
+        shell: bash
+        run: |
+          cmake -S . -B build-release -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+            -DHOLDEM_BUILD_CLI=OFF \
+            -DHOLDEM_VERSION="${{ steps.version.outputs.value }}" \
+            -DHOLDEM_APP_ICON="$PWD/build-icons/BotOrFold.icns"
+          cmake --build build-release --parallel
+          lipo -info "build-release/Bot or Fold.app/Contents/MacOS/Bot or Fold"
+          codesign --force --deep --sign - "build-release/Bot or Fold.app"
+
+      - name: Create DMG
+        shell: bash
+        run: |
+          mkdir -p dist
+          cpack --config build-release/CPackConfig.cmake -G DragNDrop -B dist
+          mv dist/Bot-or-Fold-macOS.dmg \
+            "dist/Bot-or-Fold-${{ steps.version.outputs.value }}-macOS-Universal2.dmg"
+          test -s "dist/Bot-or-Fold-${{ steps.version.outputs.value }}-macOS-Universal2.dmg"
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: dist/*.dmg
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, linux, macos, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all platform artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Verify release contains exactly four files
+        shell: bash
+        run: |
+          find release-assets -maxdepth 1 -type f -print
+          test "$(find release-assets -maxdepth 1 -type f | wc -l)" -eq 4
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create "$GITHUB_REF_NAME" release-assets/* \
+            --verify-tag \
+            --generate-notes \
+            --title "Bot or Fold $GITHUB_REF_NAME"

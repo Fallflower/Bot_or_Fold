@@ -12,10 +12,9 @@ public class MainActivity extends com.sudoevolve.euineo.MainActivity {
 
     @Override
     public void setOrientationBis(int width, int height, boolean resizable, String hint) {
-        // SDL marks its single Android window as resizable and would therefore
-        // replace our page-specific orientation with SCREEN_ORIENTATION_FULL_USER.
-        // Keep this app as the sole owner of orientation instead. This also lets
-        // SDLSurface reject transient surfaces whose aspect ratio is wrong.
+        // SDL marks its single Android window as resizable and may overwrite our
+        // page-specific policy. Keep this app as the sole owner: the setup page
+        // follows the user's device orientation while the table stays landscape.
         runOnUiThread(this::applyPresentationOrientation);
     }
 
@@ -45,7 +44,7 @@ public class MainActivity extends com.sudoevolve.euineo.MainActivity {
     private void applyPresentationOrientation() {
         final int requestedOrientation = gamePresentation
                 ? ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                : ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
+                : ActivityInfo.SCREEN_ORIENTATION_FULL_USER;
         setRequestedOrientation(requestedOrientation);
     }
 
