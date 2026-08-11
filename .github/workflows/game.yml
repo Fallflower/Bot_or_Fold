@@ -181,7 +181,8 @@ jobs:
           sudo apt-get install -y \
             cmake ninja-build build-essential libgl1-mesa-dev \
             libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev \
-            libxi-dev libwayland-dev libxkbcommon-dev
+            libxi-dev libwayland-dev libxkbcommon-dev \
+            libcurl4-openssl-dev
 
       - name: Build and install AppDir
         run: |
@@ -266,6 +267,7 @@ jobs:
             -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
             -DHOLDEM_BUILD_CLI=OFF \
             -DHOLDEM_VERSION="${{ steps.version.outputs.value }}" \
+            -DPNG_ARM_NEON=off \
             -DHOLDEM_APP_ICON="$PWD/build-icons/BotOrFold.icns"
           cmake --build build-release --parallel
           lipo -info "build-release/Bot or Fold.app/Contents/MacOS/Bot or Fold"

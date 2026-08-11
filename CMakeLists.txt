@@ -72,6 +72,12 @@ endif()
 # ============================================================================
 
 if(HOLDEM_BUILD_GUI)
+    if(APPLE)
+        # The bundled libpng 1.6.43 CMake logic can enable ARM NEON for the
+        # arm64 slice without adding its C objects to a universal archive.
+        # Disable that optional optimization for reliable macOS bundles.
+        set(PNG_ARM_NEON off CACHE STRING "Disable bundled libpng ARM NEON" FORCE)
+    endif()
     add_subdirectory(external/EUI-NEO)
 
     if(EUI_WINDOW_BACKEND STREQUAL "sdl2")
