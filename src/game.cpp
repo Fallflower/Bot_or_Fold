@@ -2,6 +2,7 @@
 #include "assistant.h"
 #include "pot_calculator.h"
 #include <algorithm>
+#include <climits>
 #include <thread>
 #include <random>
 #include <type_traits>

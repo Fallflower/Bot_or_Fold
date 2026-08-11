@@ -73,12 +73,23 @@ endif()
 
 if(HOLDEM_BUILD_GUI)
     if(APPLE)
-        # The bundled libpng 1.6.43 CMake logic can enable ARM NEON for the
-        # arm64 slice without adding its C objects to a universal archive.
-        # Disable that optional optimization for reliable macOS bundles.
+        # The bundled libpng 1.6.43 CMake logic only disables ARM NEON when
+        # TARGET_ARCH matches its ^(ARM|arm|aarch) regex. A Universal 2 build
+        # sets CMAKE_OSX_ARCHITECTURES to "x86_64;arm64", which never matches,
+        # so pngpriv.h auto-enables NEON (PNG_ARM_NEON_OPT=2) on the arm64
+        # slice while the NEON objects are never built, breaking the link.
+        # Keep the cache option for single-architecture macOS builds and force
+        # the macros off on the target below for the universal case.
         set(PNG_ARM_NEON off CACHE STRING "Disable bundled libpng ARM NEON" FORCE)
     endif()
     add_subdirectory(external/EUI-NEO)
+
+    if(APPLE AND TARGET png_static)
+        target_compile_definitions(png_static PRIVATE
+            PNG_ARM_NEON_OPT=0
+            PNG_INTEL_SSE_OPT=0
+        )
+    endif()
 
     if(EUI_WINDOW_BACKEND STREQUAL "sdl2")
         set(HOLDEM_EUI_APP_MAIN external/EUI-NEO/core/app/sdl2_app_main.cpp)
