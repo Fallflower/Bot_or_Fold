@@ -182,7 +182,8 @@ jobs:
             cmake ninja-build build-essential libgl1-mesa-dev \
             libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev \
             libxi-dev libwayland-dev libxkbcommon-dev \
-            libcurl4-openssl-dev
+            libcurl4-openssl-dev \
+            python3-pil
 
       - name: Build and install AppDir
         run: |
@@ -197,8 +198,8 @@ jobs:
         env:
           OUTPUT: Bot-or-Fold-${{ steps.version.outputs.value }}-Linux-x86_64.AppImage
         run: |
-          mkdir -p build-icons
-          cp assets/icon.png build-icons/bot-or-fold.png
+          python3 packaging/generate_icons.py \
+            assets/icon.png build-icons/bot-or-fold.png --format png
           curl -L --fail --retry 3 \
             -o linuxdeploy.AppImage \
             https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage

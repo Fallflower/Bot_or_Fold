@@ -25,7 +25,9 @@ def main() -> None:
                        (64, 64), (128, 128), (256, 256)),
             )
         else:
-            image.resize((512, 512), Image.Resampling.LANCZOS).save(
+            # Image.LANCZOS works on both Pillow 9.0.1 (ubuntu-22.04 apt)
+            # and newer releases; Image.Resampling only exists since 9.1.0.
+            image.resize((512, 512), Image.LANCZOS).save(
                 args.output, format="PNG", optimize=True
             )
 
