@@ -38,7 +38,7 @@ jobs:
           java-version: "21"
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Install Android toolchain
         shell: bash
@@ -50,7 +50,7 @@ jobs:
             "cmake;3.22.1"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
 
       - name: Cache SDL2 sources
         uses: actions/cache@v5
@@ -71,7 +71,7 @@ jobs:
             "dist/Bot-or-Fold-${{ steps.version.outputs.value }}-Android-arm64-v8a-debug.apk"
 
       - name: Upload game APK
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: android-apk
           path: dist/*.apk
@@ -148,7 +148,7 @@ jobs:
             "dist/Bot-or-Fold-${{ steps.version.outputs.value }}-Windows-x86_64.zip"
 
       - name: Upload Windows artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: windows-portable
           path: dist/*.zip
@@ -215,7 +215,7 @@ jobs:
           test -s "dist/$OUTPUT"
 
       - name: Upload Linux artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: linux-appimage
           path: dist/*.AppImage
@@ -284,7 +284,7 @@ jobs:
           test -s "dist/Bot-or-Fold-${{ steps.version.outputs.value }}-macOS-Universal2.dmg"
 
       - name: Upload macOS artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: macos-dmg
           path: dist/*.dmg
@@ -300,7 +300,7 @@ jobs:
 
     steps:
       - name: Download all platform artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           path: release-assets
           merge-multiple: true
